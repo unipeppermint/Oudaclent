@@ -4,8 +4,13 @@ final class GameViewController: BaseViewController {
     private let viewModel: GameViewModel
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
-    private let balanceBadge = PrototypeCoinBadge(amount: MockData.user.coins, dark: true)
-    private let machine = SlotMachineGrid()
+    private let balanceBadge = PrototypeCoinBadge(
+        amount: MockData.user.coins,
+        dark: true,
+        fontSize: 13,
+        horizontalInset: 3
+    )
+    private let machine: SlotMachineGrid
     private let spinButton = SpinButton()
     private let betControl = BetControl()
     private let winLabel = UILabel()
@@ -16,6 +21,7 @@ final class GameViewController: BaseViewController {
 
     init(game: SlotGame) {
         self.viewModel = GameViewModel(game: game)
+        self.machine = SlotMachineGrid(reelCount: game.reels, symbols: game.symbolSet)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -57,14 +63,19 @@ final class GameViewController: BaseViewController {
 
         let title = UILabel()
         title.text = viewModel.game.title
-        title.font = .rounded(size: 21, weight: .black)
         title.textColor = .white
         title.textAlignment = .center
+        title.numberOfLines = 1
+        title.lineBreakMode = .byClipping
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let titleFontSize: CGFloat = viewModel.game.title.count > 12 ? 18 : 21
+        title.font = .rounded(size: titleFontSize, weight: .black)
         title.adjustsFontSizeToFitWidth = true
         title.minimumScaleFactor = 0.78
 
         let jackpot = UILabel()
-        jackpot.text = "JP  1,000,000"
+        jackpot.text = "JP  \(Formatters.integer.string(from: NSNumber(value: viewModel.game.jackpotPool)) ?? "\(viewModel.game.jackpotPool)")"
         jackpot.font = .rounded(size: 15, weight: .black)
         jackpot.textColor = .brandGold
         jackpot.textAlignment = .center
@@ -80,7 +91,7 @@ final class GameViewController: BaseViewController {
 
         let titleStack = UIStackView(arrangedSubviews: [title, jackpot])
         titleStack.axis = .vertical
-        titleStack.alignment = .center
+        titleStack.alignment = .fill
         titleStack.spacing = 4
 
         let header = UIView()
@@ -92,13 +103,15 @@ final class GameViewController: BaseViewController {
         }
         balanceBadge.snp.makeConstraints { make in
             make.trailing.centerY.equalToSuperview()
-            make.width.equalTo(112)
-            make.height.equalTo(33)
+            make.width.equalTo(84)
+            make.height.equalTo(30)
         }
         titleStack.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-            make.leading.greaterThanOrEqualTo(back.snp.trailing).offset(10)
-            make.trailing.lessThanOrEqualTo(balanceBadge.snp.leading).offset(-10)
+            make.centerX.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.equalTo(188)
+            make.leading.greaterThanOrEqualTo(back.snp.trailing).offset(8)
+            make.trailing.lessThanOrEqualTo(balanceBadge.snp.leading).offset(-2)
         }
         header.snp.makeConstraints { make in
             make.height.equalTo(44)
@@ -131,6 +144,8 @@ final class GameViewController: BaseViewController {
         contentStack.setCustomSpacing(22, after: betControl)
         contentStack.addArrangedSubview(spinHolder)
 
+        betControl.minimumBet = viewModel.game.minBet
+        betControl.bet = viewModel.bet
         betControl.onChange = { [weak self] value in
             self?.viewModel.bet = value
         }

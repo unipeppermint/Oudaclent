@@ -95,7 +95,7 @@ final class BonusViewController: BaseViewController {
         chip.layer.masksToBounds = true
 
         let amount = UILabel()
-        amount.text = "1,000,000"
+        amount.text = Formatters.integer.string(from: NSNumber(value: viewModel.game.jackpotPool)) ?? "\(viewModel.game.jackpotPool)"
         amount.font = .rounded(size: 30, weight: .black)
         amount.textColor = .brandGold
         amount.adjustsFontSizeToFitWidth = true
@@ -107,7 +107,7 @@ final class BonusViewController: BaseViewController {
         name.adjustsFontSizeToFitWidth = true
         name.minimumScaleFactor = 0.75
         let subtitle = UILabel()
-        subtitle.text = "Classic 3 Reels  •  High Payout"
+        subtitle.text = viewModel.game.subtitle.replacingOccurrences(of: " · ", with: "  •  ")
         subtitle.font = .rounded(size: 15, weight: .medium)
         subtitle.textColor = UIColor.white.withAlphaComponent(0.9)
         subtitle.adjustsFontSizeToFitWidth = true
@@ -171,12 +171,10 @@ final class BonusViewController: BaseViewController {
         stack.axis = .horizontal
         stack.spacing = 10
         stack.distribution = .fillEqually
-        [
-            ("★", "Free Spins", "x 10", UIColor.brandGold),
-            ("♦", "Multiplier", "x 5", UIColor.accentCyan),
-            ("♥", "Pick Bonus", "Random Bonus", UIColor.brandPink)
-        ].forEach { item in
-            stack.addArrangedSubview(makeFeatureCard(icon: item.0, title: item.1, subtitle: item.2, color: item.3))
+        viewModel.game.features.prefix(3).enumerated().forEach { index, feature in
+            let colors: [UIColor] = [.brandGold, .accentCyan, .brandPink]
+            let symbol = viewModel.game.symbolSet.indices.contains(index) ? viewModel.game.symbolSet[index].display : "★"
+            stack.addArrangedSubview(makeFeatureCard(icon: symbol, title: feature.title, subtitle: feature.description, color: colors[index % colors.count]))
         }
         stack.snp.makeConstraints { make in
             make.height.equalTo(118)
@@ -341,7 +339,7 @@ final class BonusViewController: BaseViewController {
         buttonTitle.minimumScaleFactor = 0.75
 
         let caption = UILabel()
-        caption.text = "Min Bet 100  •  VIP Slot"
+        caption.text = "Min Bet \(viewModel.game.minBet)  •  \(viewModel.game.reels) Reels  •  \(viewModel.game.paylines) Lines"
         caption.font = .caption
         caption.textColor = .textSecondary
         caption.textAlignment = .center
@@ -372,7 +370,8 @@ final class BonusViewController: BaseViewController {
             make.height.equalTo(70)
         }
         button.addAction(UIAction { [weak self] _ in
-            (self?.tabBarController as? MainTabBarController)?.showGame()
+            guard let self else { return }
+            (self.tabBarController as? MainTabBarController)?.showGame(self.viewModel.game)
         }, for: .touchUpInside)
         return container
     }

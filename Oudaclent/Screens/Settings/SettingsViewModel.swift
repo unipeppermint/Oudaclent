@@ -35,4 +35,10 @@ final class SettingsViewModel {
         copy[keyPath: keyPath] = value
         settings = copy
     }
+
+    func setBetAmount(_ amount: Int) {
+        var copy = settings
+        copy.betAmount = amount
+        settings = copy
+    }
 }

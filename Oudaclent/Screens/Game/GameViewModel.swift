@@ -20,7 +20,7 @@ final class GameViewModel {
         self.game = game
         self.coins = user.coins
         self.jackpot = game.jackpotPool
-        self.bet = AppSettingsStore.shared.settings.betAmount
+        self.bet = max(game.minBet, AppSettingsStore.shared.settings.betAmount)
     }
 
     func spin() -> SpinOutcome? {
@@ -28,13 +28,13 @@ final class GameViewModel {
         coins -= bet
         jackpot += Int(Double(bet) * 0.08)
 
-        var result = (0..<3).map { _ in
+        var result = (0..<game.reels).map { _ in
             (0..<3).map { _ in game.symbolSet.randomElement() ?? .star }
         }
 
         if Int.random(in: 0..<100) < 30 {
             let winner = game.symbolSet.randomElement() ?? .star
-            result = (0..<3).map { column in
+            result = (0..<game.reels).map { column in
                 [game.symbolSet.randomElement() ?? .star, winner, game.symbolSet[(column + 1) % game.symbolSet.count]]
             }
         }
@@ -47,9 +47,9 @@ final class GameViewModel {
     }
 
     private func payoutMultiplier(for result: [[SlotSymbol]]) -> Int {
-        guard result.count == 3 else { return 0 }
+        guard result.count >= 3 else { return 0 }
         let middle = result.map { $0.indices.contains(1) ? $0[1] : .star }
-        if middle == [.seven, .seven, .seven] { return 100 }
+        if middle.allSatisfy({ $0 == .seven }) { return 100 }
         if middle.allSatisfy({ $0 == middle.first }) {
             switch middle.first {
             case .star: return 25

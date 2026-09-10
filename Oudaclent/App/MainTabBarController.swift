@@ -62,6 +62,13 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         selectTab(1)
     }
 
+    func showGame(_ game: SlotGame) {
+        let gameController = GameViewController(game: game)
+        gameController.tabBarItem = item(for: .game)
+        viewControllers?[1] = gameController
+        selectTab(1)
+    }
+
     func showSettings() {
         selectTab(3)
     }

@@ -2,18 +2,21 @@ import UIKit
 
 final class SlotReelView: UIView {
     private let stackView = UIStackView()
+    private let symbolFontSize: CGFloat
     private var displayLink: CADisplayLink?
     private var startTime: CFTimeInterval = 0
     private var duration: TimeInterval = 0
     private var targetSymbols: [SlotSymbol] = [.seven, .star, .diamond]
-    private let symbolPool: [SlotSymbol] = SlotSymbol.allCases + SlotSymbol.allCases + SlotSymbol.allCases
+    private let symbolPool: [SlotSymbol]
 
     var onReelStopped: (() -> Void)?
 
-    override init(frame: CGRect) {
+    init(frame: CGRect = .zero, symbolFontSize: CGFloat = 43, symbols: [SlotSymbol] = SlotSymbol.allCases) {
+        self.symbolFontSize = symbolFontSize
+        self.symbolPool = (symbols.isEmpty ? SlotSymbol.allCases : symbols) + (symbols.isEmpty ? SlotSymbol.allCases : symbols)
         super.init(frame: frame)
         setup()
-        render(symbols: [.seven, .star, .diamond])
+        render(symbols: Array(self.symbolPool.prefix(3)))
     }
 
     required init?(coder: NSCoder) {
@@ -37,7 +40,7 @@ final class SlotReelView: UIView {
     private func render(symbols: [SlotSymbol]) {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         symbols.prefix(3).forEach { symbol in
-            let badge = SymbolTile(symbol: symbol, gradient: tileGradient(for: symbol), cornerRadius: 12, fontSize: 43)
+            let badge = SymbolTile(symbol: symbol, gradient: tileGradient(for: symbol), cornerRadius: 12, fontSize: symbolFontSize)
             stackView.addArrangedSubview(badge)
         }
     }
@@ -88,11 +91,23 @@ final class SlotReelView: UIView {
 
 final class SlotMachineGrid: UIView {
     private let reelStack = UIStackView()
-    private let reels = [SlotReelView(), SlotReelView(), SlotReelView()]
+    private let reels: [SlotReelView]
+    private let symbols: [SlotSymbol]
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(reelCount: Int = 3, symbols: [SlotSymbol] = SlotSymbol.allCases) {
+        let clampedReelCount = max(3, min(5, reelCount))
+        let normalizedSymbols = symbols.isEmpty ? SlotSymbol.allCases : symbols
+        self.symbols = normalizedSymbols
+        let symbolFontSize: CGFloat = clampedReelCount >= 5 ? 34 : 43
+        self.reels = (0..<clampedReelCount).map { _ in
+            SlotReelView(symbolFontSize: symbolFontSize, symbols: normalizedSymbols)
+        }
+        super.init(frame: .zero)
         setup()
+    }
+
+    override convenience init(frame: CGRect) {
+        self.init()
     }
 
     required init?(coder: NSCoder) {
@@ -114,25 +129,31 @@ final class SlotMachineGrid: UIView {
             make.edges.equalToSuperview().inset(15)
         }
         reels.forEach { reelStack.addArrangedSubview($0) }
-        reels[0].show(symbols: [.star, .seven, .cherry])
-        reels[1].show(symbols: [.diamond, .seven, .star])
-        reels[2].show(symbols: [.cherry, .seven, .diamond])
+        reels.enumerated().forEach { index, reel in
+            reel.show(symbols: initialSymbols(for: index))
+        }
     }
 
     func spinAll(_ result: [[SlotSymbol]], completion: @escaping () -> Void) {
         var stopped = 0
         for (index, reel) in reels.enumerated() {
             reel.onReelStopped = { [weak self] in
-                guard self != nil else { return }
+                guard let self else { return }
                 stopped += 1
-                if stopped == 3 {
+                if stopped == self.reels.count {
                     completion()
                 }
             }
-            let symbols = result.indices.contains(index) ? result[index] : Array(SlotSymbol.allCases.shuffled().prefix(3))
+            let symbols = result.indices.contains(index) ? result[index] : Array(self.symbols.shuffled().prefix(3))
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.3) {
                 reel.spin(to: symbols, duration: 1.5)
             }
+        }
+    }
+
+    private func initialSymbols(for index: Int) -> [SlotSymbol] {
+        (0..<3).map { row in
+            symbols[(index + row) % symbols.count]
         }
     }
 }
@@ -174,9 +195,14 @@ final class BetControl: UIView {
     private let betLabel = UILabel()
 
     var onChange: ((Int) -> Void)?
+    var minimumBet: Int = 50 {
+        didSet {
+            bet = max(minimumBet, bet)
+        }
+    }
     var bet: Int = AppSettingsStore.shared.settings.betAmount {
         didSet {
-            bet = max(50, min(500, bet))
+            bet = max(minimumBet, min(500, bet))
             var settings = AppSettingsStore.shared.settings
             settings.betAmount = bet
             AppSettingsStore.shared.settings = settings

@@ -34,15 +34,7 @@ final class LobbyViewController: BaseViewController {
         contentStack.addArrangedSubview(makeHeader())
         contentStack.addArrangedSubview(makeCheckInBanner())
         contentStack.addArrangedSubview(makeHotHeader())
-        viewModel.slots.enumerated().forEach { index, game in
-            let row = LobbySlotRowView()
-            let tagInfo = tag(for: index)
-            row.configure(game: game, tag: tagInfo.text, tagColor: tagInfo.color, tagBackground: tagInfo.background)
-            row.addAction(UIAction { [weak self] _ in
-                self?.navigationController?.pushViewController(BonusViewController(game: game), animated: true)
-            }, for: .touchUpInside)
-            contentStack.addArrangedSubview(row)
-        }
+        contentStack.addArrangedSubview(makeHotSlotsCarousel())
     }
 
     private func makeHeader() -> UIView {
@@ -189,5 +181,39 @@ final class LobbyViewController: BaseViewController {
         case 1: return ("FREE SPIN x 10", UIColor(hex: "#047857"), UIColor(hex: "#CCFBF1"))
         default: return ("BONUS GAME", .midPurple, UIColor(hex: "#EDE9FE"))
         }
+    }
+
+    private func makeHotSlotsCarousel() -> UIView {
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.alwaysBounceHorizontal = true
+        scroll.clipsToBounds = false
+
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.spacing = 14
+        scroll.addSubview(stack)
+        stack.snp.makeConstraints { make in
+            make.edges.equalTo(scroll.contentLayoutGuide)
+            make.height.equalTo(scroll.frameLayoutGuide)
+        }
+
+        viewModel.slots.enumerated().forEach { index, game in
+            let card = LobbySlotCardView()
+            let tagInfo = tag(for: index)
+            card.configure(game: game, tag: tagInfo.text, tagColor: tagInfo.color, tagBackground: tagInfo.background)
+            card.addAction(UIAction { [weak self] _ in
+                (self?.tabBarController as? MainTabBarController)?.showGame(game)
+            }, for: .touchUpInside)
+            stack.addArrangedSubview(card)
+            card.snp.makeConstraints { make in
+                make.width.equalTo(280)
+            }
+        }
+
+        scroll.snp.makeConstraints { make in
+            make.height.equalTo(380)
+        }
+        return scroll
     }
 }
