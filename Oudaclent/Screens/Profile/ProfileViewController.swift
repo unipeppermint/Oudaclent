@@ -34,10 +34,28 @@ final class ProfileViewController: BaseViewController {
         contentStack.setCustomSpacing(26, after: contentStack.arrangedSubviews.last!)
         contentStack.addArrangedSubview(makeUserCard())
         contentStack.addArrangedSubview(makeCurrencies())
-        contentStack.addArrangedSubview(makeSectionHeader(title: "My Slots", action: "View All >"))
+        contentStack.addArrangedSubview(makeSectionHeader(title: "My Slots", action: "View All >") { [weak self] in
+            self?.showMySlotsPage()
+        })
         contentStack.addArrangedSubview(makeMySlots())
-        contentStack.addArrangedSubview(makeSectionHeader(title: "Achievements", action: "All 12 >"))
+        contentStack.addArrangedSubview(makeSectionHeader(title: "Achievements", action: "View All >") { [weak self] in
+            self?.showAchievementsPage()
+        })
         contentStack.addArrangedSubview(makeAchievements())
+    }
+
+    private func showMySlotsPage() {
+        navigationController?.pushViewController(
+            GameListViewController(title: "My Slots", games: viewModel.slots),
+            animated: true
+        )
+    }
+
+    private func showAchievementsPage() {
+        navigationController?.pushViewController(
+            AchievementsListViewController(achievements: viewModel.achievements),
+            animated: true
+        )
     }
 
     private func makeTopBar() -> UIView {
@@ -97,16 +115,10 @@ final class ProfileViewController: BaseViewController {
         tier.adjustsFontSizeToFitWidth = true
         tier.minimumScaleFactor = 0.78
 
-        let id = UILabel()
-        id.text = "ID: 88888888"
-        id.font = .caption
-        id.textColor = .textSecondary
-
         card.addSubview(avatar)
         avatar.addSubview(face)
         card.addSubview(name)
         card.addSubview(tier)
-        card.addSubview(id)
 
         avatar.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(16)
@@ -118,7 +130,7 @@ final class ProfileViewController: BaseViewController {
         }
         name.snp.makeConstraints { make in
             make.leading.equalTo(avatar.snp.trailing).offset(14)
-            make.top.equalToSuperview().offset(26)
+            make.top.equalToSuperview().offset(31)
             make.trailing.equalToSuperview().offset(-16)
         }
         tier.snp.makeConstraints { make in
@@ -126,10 +138,6 @@ final class ProfileViewController: BaseViewController {
             make.top.equalTo(name.snp.bottom).offset(6)
             make.trailing.lessThanOrEqualToSuperview().offset(-16)
             make.height.equalTo(22)
-        }
-        id.snp.makeConstraints { make in
-            make.leading.equalTo(name)
-            make.top.equalTo(tier.snp.bottom).offset(8)
         }
         card.snp.makeConstraints { make in
             make.height.equalTo(110)
@@ -145,7 +153,7 @@ final class ProfileViewController: BaseViewController {
         [
             ("★", viewModel.user.coins, "COINS", CAGradientLayer.goldGradient()),
             ("♦", viewModel.user.gems, "GEMS", PrototypeGradient.cyan()),
-            ("★", viewModel.user.points, "POINTS", PrototypeGradient.pinkPurple())
+            ("●", viewModel.user.points, "POINTS", PrototypeGradient.pinkPurple())
         ].forEach { item in
             stack.addArrangedSubview(makeCurrency(icon: item.0, value: item.1, title: item.2, gradient: item.3))
         }
@@ -191,7 +199,7 @@ final class ProfileViewController: BaseViewController {
         return card
     }
 
-    private func makeSectionHeader(title: String, action: String) -> UIView {
+    private func makeSectionHeader(title: String, action: String, onTap: @escaping () -> Void) -> UIView {
         let view = UIView()
         let titleLabel = UILabel()
         titleLabel.text = title
@@ -199,17 +207,18 @@ final class ProfileViewController: BaseViewController {
         titleLabel.textColor = .midPurple
         titleLabel.adjustsFontSizeToFitWidth = true
         titleLabel.minimumScaleFactor = 0.82
-        let actionLabel = UILabel()
-        actionLabel.text = action
-        actionLabel.font = .rounded(size: 15, weight: .medium)
-        actionLabel.textColor = .brandPurple
-        actionLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let actionButton = UIButton(type: .system)
+        actionButton.setTitle(action, for: .normal)
+        actionButton.titleLabel?.font = .rounded(size: 15, weight: .medium)
+        actionButton.setTitleColor(.brandPurple, for: .normal)
+        actionButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        actionButton.addAction(UIAction { _ in onTap() }, for: .touchUpInside)
         view.addSubview(titleLabel)
-        view.addSubview(actionLabel)
+        view.addSubview(actionButton)
         titleLabel.snp.makeConstraints { make in
             make.leading.centerY.equalToSuperview()
         }
-        actionLabel.snp.makeConstraints { make in
+        actionButton.snp.makeConstraints { make in
             make.trailing.centerY.equalToSuperview()
             make.leading.greaterThanOrEqualTo(titleLabel.snp.trailing).offset(12)
         }
@@ -335,5 +344,88 @@ final class ProfileViewController: BaseViewController {
             make.bottom.lessThanOrEqualToSuperview().offset(-8)
         }
         return card
+    }
+}
+
+private final class AchievementsListViewController: BaseViewController {
+    private let achievements: [Achievement]
+    private let scrollView = UIScrollView()
+    private let contentStack = UIStackView()
+
+    init(achievements: [Achievement]) {
+        self.achievements = achievements
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        view = PrototypeBackgroundView(style: .light)
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        navigationController?.setNavigationBarHidden(true, animated: false)
+        setup()
+    }
+
+    private func setup() {
+        scrollView.showsVerticalScrollIndicator = false
+        addSubview(scrollView) { make in
+            make.edges.equalToSuperview()
+        }
+
+        scrollView.addSubview(contentStack)
+        contentStack.axis = .vertical
+        contentStack.spacing = 12
+        contentStack.snp.makeConstraints { make in
+            make.top.equalTo(scrollView.contentLayoutGuide).offset(58)
+            make.leading.trailing.equalTo(scrollView.contentLayoutGuide).inset(18)
+            make.bottom.equalTo(scrollView.contentLayoutGuide).offset(-126)
+            make.width.equalTo(scrollView.frameLayoutGuide).offset(-36)
+        }
+
+        contentStack.addArrangedSubview(makeTopBar())
+        contentStack.setCustomSpacing(24, after: contentStack.arrangedSubviews.last!)
+
+        achievements.forEach { achievement in
+            let card = AchievementCardView()
+            card.configure(ach: achievement)
+            card.snp.makeConstraints { make in
+                make.height.equalTo(104)
+            }
+            contentStack.addArrangedSubview(card)
+        }
+    }
+
+    private func makeTopBar() -> UIView {
+        let bar = UIView()
+        let back = CircleButton(text: "<", size: 40, background: .white, tint: .midPurple)
+        back.addAction(UIAction { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        }, for: .touchUpInside)
+
+        let title = UILabel()
+        title.text = "Achievements"
+        title.textAlignment = .center
+        title.font = .rounded(size: 24, weight: .black)
+        title.textColor = .midPurple
+
+        bar.addSubview(back)
+        bar.addSubview(title)
+        back.snp.makeConstraints { make in
+            make.leading.centerY.equalToSuperview()
+        }
+        title.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.greaterThanOrEqualTo(back.snp.trailing).offset(12)
+            make.trailing.lessThanOrEqualToSuperview().offset(-12)
+        }
+        bar.snp.makeConstraints { make in
+            make.height.equalTo(40)
+        }
+        return bar
     }
 }

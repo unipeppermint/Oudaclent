@@ -155,11 +155,14 @@ final class LobbyViewController: BaseViewController {
         title.text = "Hot Slots"
         title.font = .rounded(size: 26, weight: .black)
         title.textColor = .midPurple
-        let all = UILabel()
-        all.text = "View All >"
-        all.font = .rounded(size: 16, weight: .medium)
-        all.textColor = .brandPurple
+        let all = UIButton(type: .system)
+        all.setTitle("View All >", for: .normal)
+        all.titleLabel?.font = .rounded(size: 16, weight: .medium)
+        all.setTitleColor(.brandPurple, for: .normal)
         all.setContentCompressionResistancePriority(.required, for: .horizontal)
+        all.addAction(UIAction { [weak self] _ in
+            self?.showAllGames()
+        }, for: .touchUpInside)
         view.addSubview(title)
         view.addSubview(all)
         title.snp.makeConstraints { make in
@@ -173,6 +176,13 @@ final class LobbyViewController: BaseViewController {
             make.height.equalTo(36)
         }
         return view
+    }
+
+    private func showAllGames() {
+        navigationController?.pushViewController(
+            GameListViewController(title: "All Games", games: viewModel.slots),
+            animated: true
+        )
     }
 
     private func tag(for index: Int) -> (text: String, color: UIColor, background: UIColor) {
@@ -215,5 +225,107 @@ final class LobbyViewController: BaseViewController {
             make.height.equalTo(380)
         }
         return scroll
+    }
+}
+
+final class GameListViewController: BaseViewController {
+    private let pageTitle: String
+    private let games: [SlotGame]
+    private let scrollView = UIScrollView()
+    private let contentStack = UIStackView()
+
+    init(title: String, games: [SlotGame]) {
+        self.pageTitle = title
+        self.games = games
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        view = PrototypeBackgroundView(style: .light)
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        navigationController?.setNavigationBarHidden(true, animated: false)
+        setup()
+    }
+
+    private func setup() {
+        scrollView.showsVerticalScrollIndicator = false
+        addSubview(scrollView) { make in
+            make.edges.equalToSuperview()
+        }
+
+        scrollView.addSubview(contentStack)
+        contentStack.axis = .vertical
+        contentStack.spacing = 14
+        contentStack.snp.makeConstraints { make in
+            make.top.equalTo(scrollView.contentLayoutGuide).offset(58)
+            make.leading.trailing.equalTo(scrollView.contentLayoutGuide).inset(18)
+            make.bottom.equalTo(scrollView.contentLayoutGuide).offset(-126)
+            make.width.equalTo(scrollView.frameLayoutGuide).offset(-36)
+        }
+
+        contentStack.addArrangedSubview(makeTopBar())
+        contentStack.setCustomSpacing(24, after: contentStack.arrangedSubviews.last!)
+
+        games.enumerated().forEach { index, game in
+            let card = LobbySlotCardView()
+            let tag = tag(for: index)
+            card.configure(game: game, tag: tag.text, tagColor: tag.color, tagBackground: tag.background)
+            card.addAction(UIAction { [weak self] _ in
+                (self?.tabBarController as? MainTabBarController)?.showGame(game)
+            }, for: .touchUpInside)
+            card.snp.makeConstraints { make in
+                make.height.equalTo(380)
+            }
+            contentStack.addArrangedSubview(card)
+        }
+    }
+
+    private func makeTopBar() -> UIView {
+        let bar = UIView()
+        let back = CircleButton(text: "<", size: 40, background: .white, tint: .midPurple)
+        back.addAction(UIAction { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        }, for: .touchUpInside)
+
+        let title = UILabel()
+        title.text = pageTitle
+        title.textAlignment = .center
+        title.font = .rounded(size: 24, weight: .black)
+        title.textColor = .midPurple
+        title.adjustsFontSizeToFitWidth = true
+        title.minimumScaleFactor = 0.78
+
+        bar.addSubview(back)
+        bar.addSubview(title)
+        back.snp.makeConstraints { make in
+            make.leading.centerY.equalToSuperview()
+        }
+        title.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.greaterThanOrEqualTo(back.snp.trailing).offset(12)
+            make.trailing.lessThanOrEqualToSuperview().offset(-12)
+        }
+        bar.snp.makeConstraints { make in
+            make.height.equalTo(40)
+        }
+        return bar
+    }
+
+    private func tag(for index: Int) -> (text: String, color: UIColor, background: UIColor) {
+        switch index {
+        case 0:
+            return ("JACKPOT · 1,000,000", UIColor(hex: "#B45309"), UIColor(hex: "#FEF3C7"))
+        case 1:
+            return ("FREE SPIN x 10", UIColor(hex: "#047857"), UIColor(hex: "#CCFBF1"))
+        default:
+            return ("BONUS GAME", .midPurple, UIColor(hex: "#EDE9FE"))
+        }
     }
 }

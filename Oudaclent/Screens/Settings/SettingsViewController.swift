@@ -41,7 +41,6 @@ final class SettingsViewController: BaseViewController {
         stack.addArrangedSubview(makeGeneralCard())
         stack.addArrangedSubview(makeValueCard())
         stack.addArrangedSubview(makeSupportCard())
-        stack.addArrangedSubview(makeLogoutButton())
     }
 
     private func makeTopBar() -> UIView {
@@ -271,25 +270,6 @@ final class SettingsViewController: BaseViewController {
         return row
     }
 
-    private func makeLogoutButton() -> UIView {
-        let button = UIButton(type: .system)
-        button.setTitle("Log Out", for: .normal)
-        button.setTitleColor(.warning, for: .normal)
-        button.titleLabel?.font = .rounded(size: 18, weight: .black)
-        button.layer.cornerRadius = 18
-        button.layer.borderWidth = 1
-        button.layer.borderColor = UIColor.warning.withAlphaComponent(0.45).cgColor
-        button.backgroundColor = UIColor.white.withAlphaComponent(0.38)
-        button.addPressAnimation()
-        button.addAction(UIAction { [weak self] _ in
-            self?.showLogoutConfirmation()
-        }, for: .touchUpInside)
-        button.snp.makeConstraints { make in
-            make.height.equalTo(52)
-        }
-        return button
-    }
-
     private func updateToggle(_ toggle: UISwitch, keyPath: WritableKeyPath<AppSettings, Bool>, value: Bool) {
         viewModel.set(value, for: keyPath)
         if keyPath == \AppSettings.vibrationEnabled, value {
@@ -328,15 +308,6 @@ final class SettingsViewController: BaseViewController {
     private func showAbout() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         showMessage(title: "About Us", message: "Lucky Slots\nVersion \(version)\nA casual slot prototype built for fast play and rewards.")
-    }
-
-    private func showLogoutConfirmation() {
-        let alert = UIAlertController(title: "Log Out", message: "Are you sure you want to log out?", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Log Out", style: .destructive) { [weak self] _ in
-            self?.showMessage(title: "Logged Out", message: "Your local game settings have been kept on this device.")
-        })
-        present(alert, animated: true)
     }
 
     private func showMessage(title: String, message: String) {
