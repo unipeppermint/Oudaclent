@@ -6,8 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D4AE73307C7ECE864DCD81AA /* Pods_Oudaclent.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 419B1915C98FA122FC92BBED /* Pods_Oudaclent.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		04C4B48B305011D3009EB505 /* Oudaclent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Oudaclent.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		419B1915C98FA122FC92BBED /* Pods_Oudaclent.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Oudaclent.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		4722A2E348547E76F0F640F8 /* Pods-Oudaclent.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Oudaclent.release.xcconfig"; path = "Target Support Files/Pods-Oudaclent/Pods-Oudaclent.release.xcconfig"; sourceTree = "<group>"; };
+		EEBCBC1A0AE5584D9AF1A2E1 /* Pods-Oudaclent.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Oudaclent.debug.xcconfig"; path = "Target Support Files/Pods-Oudaclent/Pods-Oudaclent.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,17 +43,30 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4AE73307C7ECE864DCD81AA /* Pods_Oudaclent.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		030C44E0BE9CF2C230E90C8D /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				EEBCBC1A0AE5584D9AF1A2E1 /* Pods-Oudaclent.debug.xcconfig */,
+				4722A2E348547E76F0F640F8 /* Pods-Oudaclent.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		04C4B482305011D3009EB505 = {
 			isa = PBXGroup;
 			children = (
 				04C4B48D305011D3009EB505 /* Oudaclent */,
 				04C4B48C305011D3009EB505 /* Products */,
+				030C44E0BE9CF2C230E90C8D /* Pods */,
+				0AE1F04D7EFD3F9240C47570 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,6 +78,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		0AE1F04D7EFD3F9240C47570 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				419B1915C98FA122FC92BBED /* Pods_Oudaclent.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -65,9 +93,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 04C4B49E305011D4009EB505 /* Build configuration list for PBXNativeTarget "Oudaclent" */;
 			buildPhases = (
+				61F7D0547BA3D7854F9B45F1 /* [CP] Check Pods Manifest.lock */,
 				04C4B487305011D3009EB505 /* Sources */,
 				04C4B488305011D3009EB505 /* Frameworks */,
 				04C4B489305011D3009EB505 /* Resources */,
+				6885CD764AE387F304769E28 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -125,6 +155,48 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		61F7D0547BA3D7854F9B45F1 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Oudaclent-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		6885CD764AE387F304769E28 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Oudaclent/Pods-Oudaclent-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Oudaclent/Pods-Oudaclent-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Oudaclent/Pods-Oudaclent-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		04C4B487305011D3009EB505 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -138,6 +210,7 @@
 /* Begin XCBuildConfiguration section */
 		04C4B49F305011D4009EB505 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = EEBCBC1A0AE5584D9AF1A2E1 /* Pods-Oudaclent.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -174,6 +247,7 @@
 		};
 		04C4B4A0305011D4009EB505 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4722A2E348547E76F0F640F8 /* Pods-Oudaclent.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -245,7 +319,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -308,7 +382,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;

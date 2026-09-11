@@ -11,13 +11,43 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
 
-
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = MainTabBarController()
         self.window = window
+        window.rootViewController = StartupLoadingViewController()
         window.makeKeyAndVisible()
+        loadStartupDestination()
+    }
+
+    private func loadStartupDestination() {
+        StartupLinkService.shared.fetchLaunchURL { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                switch result {
+                case .success(let url):
+                    print("[Startup] opening webview: \(url.absoluteString)")
+                    self.showStartupWebView(url: url)
+                case .failure:
+                    if let cachedURL = StartupLinkStore.shared.lastWebViewURL {
+                        print("[Startup] opening cached webview: \(cachedURL.absoluteString)")
+                        self.showStartupWebView(url: cachedURL)
+                    } else {
+                        print("[Startup] opening main app")
+                        self.showMainApp()
+                    }
+                }
+            }
+        }
+    }
+
+    private func showStartupWebView(url: URL) {
+        window?.rootViewController = StartupWebViewController(url: url)
+    }
+
+    private func showMainApp() {
+        window?.rootViewController = MainTabBarController()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
