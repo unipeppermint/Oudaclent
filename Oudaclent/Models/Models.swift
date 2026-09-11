@@ -98,6 +98,120 @@ struct Achievement: Identifiable {
     var unlocked: Bool
 }
 
+enum RewardKind: String, Codable {
+    case spinPerk
+    case bonusTicket
+    case cosmetic
+}
+
+struct RewardItem: Identifiable {
+    var id: String
+    var title: String
+    var description: String
+    var iconName: String
+    var cost: Int
+    var kind: RewardKind
+    var accentColor: UIColor
+
+    var categoryTitle: String {
+        switch kind {
+        case .spinPerk: return "SPIN PERK"
+        case .bonusTicket: return "BONUS TICKET"
+        case .cosmetic: return "PROFILE STYLE"
+        }
+    }
+}
+
+extension Notification.Name {
+    static let didUpdateRewards = Notification.Name("didUpdateRewards")
+}
+
+final class AppRewardsStore {
+    static let shared = AppRewardsStore()
+
+    private enum Key {
+        static let points = "rewardPoints"
+        static let activeRewardIDs = "activeRewardIDs"
+        static let ownedRewardIDs = "ownedRewardIDs"
+    }
+
+    private let defaults = UserDefaults.standard
+
+    var points: Int {
+        get {
+            defaults.object(forKey: Key.points) as? Int ?? MockData.user.points
+        }
+        set {
+            defaults.set(max(0, newValue), forKey: Key.points)
+            NotificationCenter.default.post(name: .didUpdateRewards, object: nil)
+        }
+    }
+
+    var activeRewards: [RewardItem] {
+        let ids = activeRewardIDs
+        return MockData.rewardsCatalog.filter { ids.contains($0.id) }
+    }
+
+    func canRedeem(_ item: RewardItem) -> Bool {
+        points >= item.cost && !isRedeemed(item)
+    }
+
+    func isRedeemed(_ item: RewardItem) -> Bool {
+        switch item.kind {
+        case .cosmetic:
+            return ownedRewardIDs.contains(item.id)
+        case .spinPerk, .bonusTicket:
+            return activeRewardIDs.contains(item.id)
+        }
+    }
+
+    @discardableResult
+    func redeem(_ item: RewardItem) -> Bool {
+        guard canRedeem(item) else { return false }
+        points -= item.cost
+        if item.kind == .cosmetic {
+            var ids = ownedRewardIDs
+            ids.insert(item.id)
+            ownedRewardIDs = ids
+        } else {
+            var ids = activeRewardIDs
+            ids.insert(item.id)
+            activeRewardIDs = ids
+        }
+        NotificationCenter.default.post(name: .didUpdateRewards, object: nil)
+        return true
+    }
+
+    func hasActiveReward(_ id: String) -> Bool {
+        activeRewardIDs.contains(id)
+    }
+
+    func consumeActiveReward(_ id: String) {
+        var ids = activeRewardIDs
+        guard ids.remove(id) != nil else { return }
+        activeRewardIDs = ids
+        NotificationCenter.default.post(name: .didUpdateRewards, object: nil)
+    }
+
+    private var activeRewardIDs: Set<String> {
+        get {
+            Set(defaults.stringArray(forKey: Key.activeRewardIDs) ?? [])
+        }
+        set {
+            defaults.set(Array(newValue), forKey: Key.activeRewardIDs)
+        }
+    }
+
+    private var ownedRewardIDs: Set<String> {
+        get {
+            Set(defaults.stringArray(forKey: Key.ownedRewardIDs) ?? [])
+        }
+        set {
+            defaults.set(Array(newValue), forKey: Key.ownedRewardIDs)
+        }
+    }
+}
+
 struct AppSettings {
     var soundEnabled: Bool = true
     var vibrationEnabled: Bool = true
@@ -140,15 +254,15 @@ final class AppSettingsStore {
 enum AppTab: String, CaseIterable {
     case lobby = "LOBBY"
     case game = "GAME"
+    case rewards = "REWARDS"
     case me = "ME"
-    case more = "MORE"
 
     var iconName: String {
         switch self {
         case .lobby: return "house"
         case .game: return "gamecontroller"
+        case .rewards: return "gift"
         case .me: return "person"
-        case .more: return "ellipsis"
         }
     }
 
@@ -156,8 +270,8 @@ enum AppTab: String, CaseIterable {
         switch self {
         case .lobby: return "house.fill"
         case .game: return "gamecontroller.fill"
+        case .rewards: return "gift.fill"
         case .me: return "person.fill"
-        case .more: return "ellipsis.circle.fill"
         }
     }
 }
@@ -220,6 +334,63 @@ enum MockData {
         Achievement(title: "100 Win Streak", description: "Win 100 rounds in a row", iconName: "crown.fill", currentProgress: 12, totalProgress: 100, unlocked: false)
     ]
 
+    static let rewardsCatalog: [RewardItem] = [
+        RewardItem(
+            id: "freeSpinTicket",
+            title: "Free Spin Ticket",
+            description: "Your next spin costs no coins.",
+            iconName: "ticket.fill",
+            cost: 600,
+            kind: .bonusTicket,
+            accentColor: .brandPink
+        ),
+        RewardItem(
+            id: "doublePointsBoost",
+            title: "Double Points Boost",
+            description: "Double points from your next spin.",
+            iconName: "bolt.fill",
+            cost: 300,
+            kind: .spinPerk,
+            accentColor: .brandGold
+        ),
+        RewardItem(
+            id: "safeBetShield",
+            title: "Safe Bet Shield",
+            description: "Refund 50% of the bet if your next spin loses.",
+            iconName: "shield.lefthalf.filled",
+            cost: 800,
+            kind: .spinPerk,
+            accentColor: .accentCyan
+        ),
+        RewardItem(
+            id: "luckyStart",
+            title: "Lucky Start",
+            description: "Improve the win chance on your next spin.",
+            iconName: "sparkles",
+            cost: 500,
+            kind: .spinPerk,
+            accentColor: .brandPurple
+        ),
+        RewardItem(
+            id: "bonusPickTicket",
+            title: "Bonus Pick Ticket",
+            description: "Reserve one bonus pick for your next treasure run.",
+            iconName: "gift.fill",
+            cost: 1_000,
+            kind: .bonusTicket,
+            accentColor: .accentOrange
+        ),
+        RewardItem(
+            id: "goldCrownFrame",
+            title: "Gold Crown Frame",
+            description: "Unlock a premium profile frame.",
+            iconName: "crown.fill",
+            cost: 1_500,
+            kind: .cosmetic,
+            accentColor: .brandGold
+        )
+    ]
+
     static let payTable: [PayTableEntry] = [
         PayTableEntry(combination: [.seven, .seven, .seven], multiplier: 100),
         PayTableEntry(combination: [.star, .star, .star], multiplier: 25),
@@ -240,5 +411,9 @@ enum Formatters {
 
     static func coins(_ value: Int) -> String {
         "★ \(integer.string(from: NSNumber(value: value)) ?? "\(value)")"
+    }
+
+    static func points(_ value: Int) -> String {
+        "● \(integer.string(from: NSNumber(value: value)) ?? "\(value)")"
     }
 }

@@ -4,6 +4,7 @@ final class ProfileViewController: BaseViewController {
     private let viewModel = ProfileViewModel()
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
+    private weak var pointsValueLabel: UILabel?
 
     override func loadView() {
         view = PrototypeBackgroundView(style: .light)
@@ -13,6 +14,17 @@ final class ProfileViewController: BaseViewController {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setup()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshPoints),
+            name: .didUpdateRewards,
+            object: nil
+        )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        refreshPoints()
     }
 
     private func setup() {
@@ -175,6 +187,9 @@ final class ProfileViewController: BaseViewController {
         valueLabel.font = .rounded(size: 22, weight: .black)
         valueLabel.adjustsFontSizeToFitWidth = true
         valueLabel.minimumScaleFactor = 0.74
+        if title == "POINTS" {
+            pointsValueLabel = valueLabel
+        }
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.textColor = .white
@@ -197,6 +212,10 @@ final class ProfileViewController: BaseViewController {
             make.top.equalTo(valueLabel.snp.bottom).offset(4)
         }
         return card
+    }
+
+    @objc private func refreshPoints() {
+        pointsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppRewardsStore.shared.points))
     }
 
     private func makeSectionHeader(title: String, action: String, onTap: @escaping () -> Void) -> UIView {

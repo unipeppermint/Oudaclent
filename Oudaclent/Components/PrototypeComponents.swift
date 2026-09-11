@@ -232,8 +232,8 @@ private final class FloatingTabItemView: UIControl {
         switch tab {
         case .lobby: return "▦"
         case .game: return "◆"
+        case .rewards: return "★"
         case .me: return "●"
-        case .more: return "≡"
         }
     }
 }

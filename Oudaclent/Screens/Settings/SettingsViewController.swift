@@ -47,7 +47,11 @@ final class SettingsViewController: BaseViewController {
         let bar = UIView()
         let back = CircleButton(text: "<", size: 40, background: .white, tint: .midPurple)
         back.addAction(UIAction { [weak self] _ in
-            (self?.tabBarController as? MainTabBarController)?.showLobby()
+            if let navigationController = self?.navigationController, navigationController.viewControllers.count > 1 {
+                navigationController.popViewController(animated: true)
+            } else {
+                (self?.tabBarController as? MainTabBarController)?.showLobby()
+            }
         }, for: .touchUpInside)
         let title = UILabel()
         title.text = "Settings"

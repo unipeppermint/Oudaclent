@@ -18,13 +18,13 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         let game = GameViewController(game: MockData.hotSlots[0])
         game.tabBarItem = item(for: .game)
 
+        let rewards = UINavigationController(rootViewController: RewardsViewController())
+        rewards.tabBarItem = item(for: .rewards)
+
         let profile = UINavigationController(rootViewController: ProfileViewController())
         profile.tabBarItem = item(for: .me)
 
-        let settings = UINavigationController(rootViewController: SettingsViewController())
-        settings.tabBarItem = item(for: .more)
-
-        viewControllers = [lobby, game, profile, settings]
+        viewControllers = [lobby, game, rewards, profile]
     }
 
     private func configureAppearance() {
@@ -71,6 +71,9 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
 
     func showSettings() {
         selectTab(3)
+        guard let navigationController = viewControllers?[3] as? UINavigationController else { return }
+        if navigationController.topViewController is SettingsViewController { return }
+        navigationController.pushViewController(SettingsViewController(), animated: true)
     }
 
     private func item(for tab: AppTab) -> UITabBarItem {
