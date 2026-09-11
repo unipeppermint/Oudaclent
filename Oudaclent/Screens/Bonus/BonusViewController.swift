@@ -4,6 +4,13 @@ final class BonusViewController: BaseViewController {
     private let viewModel: BonusViewModel
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
+    private let chestStack = UIStackView()
+    private var chestButtons: [UIControl] = []
+    private var chestValueLabels: [UILabel] = []
+    private weak var gemsLabel: UILabel?
+    private weak var bonusStatusLabel: UILabel?
+    private weak var doubleBadge: PaddingLabel?
+    private let rerollButton = PrimaryButton(title: "REROLL READY", gradient: PrototypeGradient.cyan())
 
     init(game: SlotGame) {
         self.viewModel = BonusViewModel(game: game)
@@ -43,14 +50,25 @@ final class BonusViewController: BaseViewController {
         contentStack.setCustomSpacing(28, after: contentStack.arrangedSubviews.last!)
         contentStack.addArrangedSubview(makeHero())
         contentStack.addArrangedSubview(makeFeatureRow())
+        if viewModel.isTreasureBonus {
+            contentStack.addArrangedSubview(makeTreasureBonus())
+        }
         contentStack.addArrangedSubview(makePayTable())
         contentStack.addArrangedSubview(makeCTA())
+        updateTreasureBonusUI()
     }
 
     private func makeTopBar() -> UIView {
         let bar = UIView()
         let back = CircleButton(text: "<", size: 40, background: .white, tint: .midPurple)
-        back.addAction(UIAction { [weak self] _ in self?.navigationController?.popViewController(animated: true) }, for: .touchUpInside)
+        back.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            if let navigationController = self.navigationController, navigationController.viewControllers.count > 1 {
+                navigationController.popViewController(animated: true)
+            } else {
+                self.dismiss(animated: true)
+            }
+        }, for: .touchUpInside)
         let title = UILabel()
         title.text = "\(viewModel.game.title) Features"
         title.font = .rounded(size: 24, weight: .black)
@@ -275,6 +293,223 @@ final class BonusViewController: BaseViewController {
         return card
     }
 
+    private func makeTreasureBonus() -> UIView {
+        let card = UIView()
+        card.backgroundColor = .white
+        card.layer.cornerRadius = 20
+        card.applySoftShadow()
+
+        let title = UILabel()
+        title.text = "Treasure Bonus"
+        title.font = .rounded(size: 22, weight: .black)
+        title.textColor = .midPurple
+
+        let subtitle = UILabel()
+        subtitle.text = "Pick one chest. Premium boosts are powered by Gems."
+        subtitle.font = .rounded(size: 13, weight: .medium)
+        subtitle.textColor = .textSecondary
+        subtitle.numberOfLines = 2
+        subtitle.adjustsFontSizeToFitWidth = true
+        subtitle.minimumScaleFactor = 0.78
+
+        let balance = UILabel()
+        balance.font = .rounded(size: 15, weight: .black)
+        balance.textColor = .accentCyan
+        balance.textAlignment = .right
+        gemsLabel = balance
+
+        chestStack.axis = .horizontal
+        chestStack.spacing = 8
+        chestStack.distribution = .fillEqually
+        for index in 0..<3 {
+            let button = makeChestButton(index: index)
+            chestButtons.append(button)
+            chestStack.addArrangedSubview(button)
+        }
+
+        let doubleBadge = PaddingLabel()
+        doubleBadge.font = .rounded(size: 11, weight: .black)
+        doubleBadge.textColor = .accentOrange
+        doubleBadge.backgroundColor = UIColor.accentOrange.withAlphaComponent(0.12)
+        doubleBadge.layer.cornerRadius = 10
+        doubleBadge.layer.masksToBounds = true
+        doubleBadge.insets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        doubleBadge.textAlignment = .center
+        doubleBadge.tag = 2001
+        self.doubleBadge = doubleBadge
+
+        let status = UILabel()
+        status.font = .rounded(size: 13, weight: .medium)
+        status.textColor = .textSecondary
+        status.textAlignment = .left
+        status.numberOfLines = 2
+        bonusStatusLabel = status
+
+        rerollButton.addAction(UIAction { [weak self] _ in
+            self?.rerollChests()
+        }, for: .touchUpInside)
+
+        card.addSubview(title)
+        card.addSubview(balance)
+        card.addSubview(subtitle)
+        card.addSubview(chestStack)
+        card.addSubview(doubleBadge)
+        card.addSubview(status)
+        card.addSubview(rerollButton)
+
+        title.snp.makeConstraints { make in
+            make.leading.top.equalToSuperview().offset(16)
+            make.trailing.lessThanOrEqualTo(balance.snp.leading).offset(-8)
+        }
+        balance.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalTo(title)
+            make.width.equalTo(84)
+        }
+        subtitle.snp.makeConstraints { make in
+            make.leading.equalTo(title)
+            make.trailing.equalToSuperview().offset(-16)
+            make.top.equalTo(title.snp.bottom).offset(5)
+        }
+        chestStack.snp.makeConstraints { make in
+            make.leading.trailing.equalToSuperview().inset(16)
+            make.top.equalTo(subtitle.snp.bottom).offset(14)
+            make.height.equalTo(76)
+        }
+        doubleBadge.snp.makeConstraints { make in
+            make.leading.equalTo(title)
+            make.top.equalTo(chestStack.snp.bottom).offset(10)
+            make.height.equalTo(22)
+        }
+        rerollButton.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-16)
+            make.centerY.equalTo(doubleBadge)
+            make.width.equalTo(132)
+            make.height.equalTo(34)
+        }
+        status.snp.makeConstraints { make in
+            make.leading.equalTo(title)
+            make.trailing.equalToSuperview().offset(-16)
+            make.top.equalTo(doubleBadge.snp.bottom).offset(7)
+            make.bottom.equalToSuperview().offset(-14)
+        }
+        card.snp.makeConstraints { make in
+            make.height.equalTo(224)
+        }
+        return card
+    }
+
+    private func makeChestButton(index: Int) -> UIControl {
+        let button = UIControl()
+        button.backgroundColor = UIColor.accentOrange.withAlphaComponent(0.12)
+        button.layer.cornerRadius = 14
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.accentOrange.withAlphaComponent(0.38).cgColor
+        button.addPressAnimation()
+
+        let icon = UILabel()
+        icon.text = "?"
+        icon.font = .rounded(size: 28, weight: .black)
+        icon.textColor = .accentOrange
+        icon.textAlignment = .center
+
+        let value = UILabel()
+        value.font = .rounded(size: 12, weight: .black)
+        value.textColor = .midPurple
+        value.textAlignment = .center
+        value.text = "CHEST \(index + 1)"
+        chestValueLabels.append(value)
+
+        let stack = UIStackView(arrangedSubviews: [icon, value])
+        stack.axis = .vertical
+        stack.alignment = .fill
+        stack.spacing = 2
+        stack.isUserInteractionEnabled = false
+        button.addSubview(stack)
+        stack.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.trailing.equalToSuperview().inset(4)
+        }
+        button.addAction(UIAction { [weak self] _ in
+            self?.claimChest(index: index)
+        }, for: .touchUpInside)
+        return button
+    }
+
+    private func updateTreasureBonusUI() {
+        guard viewModel.isTreasureBonus else { return }
+        gemsLabel?.text = Formatters.gems(viewModel.gems)
+        doubleBadge?.text = viewModel.hasDoubleTreasure ? "2X TREASURE ACTIVE" : "2X TREASURE IN STORE"
+        doubleBadge?.textColor = viewModel.hasDoubleTreasure ? .white : .accentOrange
+        doubleBadge?.backgroundColor = viewModel.hasDoubleTreasure ? .accentOrange : UIColor.accentOrange.withAlphaComponent(0.12)
+
+        if let selectedChest = viewModel.selectedChest {
+            chestValueLabels.enumerated().forEach { index, label in
+                label.text = index == selectedChest
+                    ? "+\(Formatters.integer.string(from: NSNumber(value: viewModel.claimedReward ?? viewModel.chestRewards[index])) ?? "\(viewModel.claimedReward ?? viewModel.chestRewards[index])")"
+                    : "LOCKED"
+                label.textColor = index == selectedChest ? .success : .locked
+            }
+            bonusStatusLabel?.text = "Treasure claimed. Return to the game when you are ready."
+        } else {
+            chestValueLabels.enumerated().forEach { index, label in
+                label.text = "CHEST \(index + 1)"
+                label.textColor = .midPurple
+                chestButtons[index].isEnabled = true
+                chestButtons[index].alpha = 1
+            }
+            bonusStatusLabel?.text = viewModel.hasDoubleTreasure
+                ? "Double Treasure will multiply your selected chest."
+                : "Pick a chest or redeem a premium boost in the Gems Store."
+        }
+        if let selectedChest = viewModel.selectedChest {
+            chestButtons.enumerated().forEach { index, button in
+                button.isEnabled = false
+                button.alpha = index == selectedChest ? 1 : 0.5
+            }
+        }
+        rerollButton.title = viewModel.canReroll ? "REROLL READY" : "GET REROLL"
+        rerollButton.setEnabled(viewModel.selectedChest == nil)
+    }
+
+    private func claimChest(index: Int) {
+        guard let result = viewModel.claimChest(at: index) else { return }
+        updateTreasureBonusUI()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let multiplierText = result.wasDoubled ? " 2x boost applied." : ""
+        showMessage(
+            title: "Treasure Found",
+            message: "+\(result.coinsAwarded) Coins awarded.\(multiplierText)"
+        )
+    }
+
+    private func rerollChests() {
+        guard viewModel.reroll() else {
+            let alert = UIAlertController(
+                title: "Reroll Unavailable",
+                message: "Redeem Treasure Reroll in the Gems Store first.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "CANCEL", style: .cancel))
+            alert.addAction(UIAlertAction(title: "OPEN STORE", style: .default) { [weak self] _ in
+                guard let self else { return }
+                self.dismiss(animated: true) {
+                    (self.tabBarController as? MainTabBarController)?.showRewards()
+                }
+            })
+            present(alert, animated: true)
+            return
+        }
+        updateTreasureBonusUI()
+        showMessage(title: "Chests Rerolled", message: "A fresh set of treasure rewards is ready.")
+    }
+
+    private func showMessage(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
     private func makePayRow(symbol: SlotSymbol, payout: String) -> UIView {
         let row = UIView()
         if symbol == .seven {
@@ -371,7 +606,15 @@ final class BonusViewController: BaseViewController {
         }
         button.addAction(UIAction { [weak self] _ in
             guard let self else { return }
-            (self.tabBarController as? MainTabBarController)?.showGame(self.viewModel.game)
+            let showGame: () -> Void = { [weak self] in
+                guard let self else { return }
+                (self.tabBarController as? MainTabBarController)?.showGame(self.viewModel.game)
+            }
+            if self.presentingViewController != nil {
+                self.dismiss(animated: true, completion: showGame)
+            } else {
+                showGame()
+            }
         }, for: .touchUpInside)
         return container
     }

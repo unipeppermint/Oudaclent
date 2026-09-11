@@ -4,6 +4,8 @@ final class LobbyViewController: BaseViewController {
     private let viewModel = LobbyViewModel()
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
+    private let balanceBadge = PrototypeCoinBadge(amount: AppCurrencyStore.shared.coins)
+    private let checkInBanner = CheckInBannerView()
 
     override func loadView() {
         view = PrototypeBackgroundView(style: .light)
@@ -13,6 +15,23 @@ final class LobbyViewController: BaseViewController {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setup()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshHome),
+            name: .didUpdateWallet,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshHome),
+            name: .didUpdateEngagement,
+            object: nil
+        )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        refreshHome()
     }
 
     private func setup() {
@@ -60,13 +79,11 @@ final class LobbyViewController: BaseViewController {
         subtitle.adjustsFontSizeToFitWidth = true
         subtitle.minimumScaleFactor = 0.8
 
-        let balance = PrototypeCoinBadge(amount: viewModel.user.coins)
-
         container.addSubview(avatar)
         avatar.addSubview(face)
         container.addSubview(title)
         container.addSubview(subtitle)
-        container.addSubview(balance)
+        container.addSubview(balanceBadge)
 
         avatar.snp.makeConstraints { make in
             make.leading.top.bottom.equalToSuperview()
@@ -75,7 +92,7 @@ final class LobbyViewController: BaseViewController {
         face.snp.makeConstraints { make in
             make.center.equalToSuperview()
         }
-        balance.snp.makeConstraints { make in
+        balanceBadge.snp.makeConstraints { make in
             make.trailing.centerY.equalToSuperview()
             make.width.equalTo(112)
             make.height.equalTo(30)
@@ -83,12 +100,12 @@ final class LobbyViewController: BaseViewController {
         title.snp.makeConstraints { make in
             make.leading.equalTo(avatar.snp.trailing).offset(10)
             make.top.equalToSuperview().offset(12)
-            make.trailing.lessThanOrEqualTo(balance.snp.leading).offset(-8)
+            make.trailing.lessThanOrEqualTo(balanceBadge.snp.leading).offset(-8)
         }
         subtitle.snp.makeConstraints { make in
             make.leading.equalTo(title)
             make.top.equalTo(title.snp.bottom).offset(3)
-            make.trailing.lessThanOrEqualTo(balance.snp.leading).offset(-8)
+            make.trailing.lessThanOrEqualTo(balanceBadge.snp.leading).offset(-8)
         }
         container.snp.makeConstraints { make in
             make.height.equalTo(88)
@@ -97,56 +114,45 @@ final class LobbyViewController: BaseViewController {
     }
 
     private func makeCheckInBanner() -> UIView {
-        let banner = GradientView(gradient: PrototypeGradient.pinkPurple(), cornerRadius: 20)
-        banner.applyCardShadow()
-
-        let title = UILabel()
-        title.text = "Daily Check-in · Earn Coins"
-        title.font = .rounded(size: 22, weight: .black)
-        title.textColor = .white
-        title.adjustsFontSizeToFitWidth = true
-
-        let subtitle = UILabel()
-        subtitle.text = "7-day streak: 1,000 bonus"
-        subtitle.font = .body
-        subtitle.textColor = UIColor.white.withAlphaComponent(0.9)
-
-        let badge = UIView()
-        badge.backgroundColor = UIColor.white.withAlphaComponent(0.25)
-        badge.layer.cornerRadius = 27
-        let bang = UILabel()
-        bang.text = "!"
-        bang.font = .rounded(size: 38, weight: .black)
-        bang.textColor = .white
-        bang.textAlignment = .center
-
-        banner.addSubview(title)
-        banner.addSubview(subtitle)
-        banner.addSubview(badge)
-        badge.addSubview(bang)
-
-        title.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(16)
-            make.top.equalToSuperview().offset(22)
-            make.trailing.lessThanOrEqualTo(badge.snp.leading).offset(-12)
-        }
-        subtitle.snp.makeConstraints { make in
-            make.leading.equalTo(title)
-            make.top.equalTo(title.snp.bottom).offset(4)
-            make.trailing.lessThanOrEqualTo(badge.snp.leading).offset(-12)
-        }
-        badge.snp.makeConstraints { make in
-            make.trailing.equalToSuperview().offset(-16)
-            make.centerY.equalToSuperview()
-            make.width.height.equalTo(54)
-        }
-        bang.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-        }
-        banner.snp.makeConstraints { make in
+        checkInBanner.configure(
+            streak: AppEngagementStore.shared.nextCheckInReward.streak,
+            canCheckIn: AppEngagementStore.shared.canCheckIn,
+            nextReward: (
+                coins: AppEngagementStore.shared.nextCheckInReward.coins,
+                gems: AppEngagementStore.shared.nextCheckInReward.gems
+            ),
+            onCheckIn: { [weak self] in self?.claimCheckIn() }
+        )
+        checkInBanner.snp.makeConstraints { make in
             make.height.equalTo(80)
         }
-        return banner
+        return checkInBanner
+    }
+
+    @objc private func refreshHome() {
+        balanceBadge.configure(amount: AppCurrencyStore.shared.coins)
+        let engagement = AppEngagementStore.shared
+        let reward = engagement.nextCheckInReward
+        checkInBanner.configure(
+            streak: reward.streak,
+            canCheckIn: engagement.canCheckIn,
+            nextReward: (coins: reward.coins, gems: reward.gems),
+            onCheckIn: { [weak self] in self?.claimCheckIn() }
+        )
+    }
+
+    private func claimCheckIn() {
+        guard let result = AppEngagementStore.shared.checkIn() else { return }
+        showMessage(
+            title: "Daily Reward Claimed",
+            message: "Day \(min(7, result.streak))/7 · +\(result.coins) Coins · +\(result.gems) Gems"
+        )
+    }
+
+    private func showMessage(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
     private func makeHotHeader() -> UIView {

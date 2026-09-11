@@ -5,7 +5,7 @@ final class GameViewController: BaseViewController {
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
     private let balanceBadge = PrototypeCoinBadge(
-        amount: MockData.user.coins,
+        amount: AppCurrencyStore.shared.coins,
         dark: true,
         fontSize: 13,
         horizontalInset: 3
@@ -38,10 +38,17 @@ final class GameViewController: BaseViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setup()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshWallet),
+            name: .didUpdateWallet,
+            object: nil
+        )
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        refreshWallet()
         updateRewardBanner()
     }
 
@@ -146,6 +153,10 @@ final class GameViewController: BaseViewController {
             make.height.equalTo(44)
         }
         contentStack.setCustomSpacing(14, after: rewardBanner)
+        if viewModel.game.id == "treasureHunter" {
+            contentStack.addArrangedSubview(makeBonusLink())
+            contentStack.setCustomSpacing(14, after: contentStack.arrangedSubviews.last!)
+        }
         contentStack.addArrangedSubview(machine)
         machine.snp.makeConstraints { make in
             make.height.equalTo(machine.snp.width).multipliedBy(0.78)
@@ -196,16 +207,82 @@ final class GameViewController: BaseViewController {
         let win = outcome.win
         let visibleWin = win > 0 ? win : 1_500
         winLabel.text = "BIG WIN! +\(Formatters.integer.string(from: NSNumber(value: visibleWin)) ?? "\(visibleWin)")"
-        let pointsText = "+\(Formatters.integer.string(from: NSNumber(value: outcome.pointsEarned)) ?? "\(outcome.pointsEarned)") POINTS"
-        if let rewardMessage = outcome.rewardMessage {
-            pointsEarnedLabel.text = "\(pointsText) · \(rewardMessage)"
-        } else {
-            pointsEarnedLabel.text = pointsText
+        var earnedText = "+\(Formatters.integer.string(from: NSNumber(value: outcome.pointsEarned)) ?? "\(outcome.pointsEarned)") POINTS"
+        if outcome.gemsEarned > 0 {
+            earnedText += " · +\(outcome.gemsEarned) GEMS"
         }
+        pointsEarnedLabel.text = outcome.rewardMessage.map { "\(earnedText) · \($0)" } ?? earnedText
         if win >= viewModel.bet * 10 {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             BigWinOverlayView().show(amount: win, in: view)
         }
+    }
+
+    @objc private func refreshWallet() {
+        viewModel.refreshBalances()
+        balanceBadge.configure(amount: viewModel.coins)
+    }
+
+    private func makeBonusLink() -> UIView {
+        let link = UIControl()
+        link.backgroundColor = UIColor.white.withAlphaComponent(0.14)
+        link.layer.cornerRadius = 16
+        link.layer.cornerCurve = .continuous
+        link.layer.borderWidth = 1
+        link.layer.borderColor = UIColor.brandGold.withAlphaComponent(0.38).cgColor
+        link.addPressAnimation()
+
+        let icon = UIImageView(image: UIImage(systemName: "gift.fill"))
+        icon.tintColor = .brandGold
+        icon.contentMode = .scaleAspectFit
+
+        let title = UILabel()
+        title.text = "Treasure Bonus"
+        title.font = .rounded(size: 15, weight: .black)
+        title.textColor = .white
+
+        let subtitle = UILabel()
+        subtitle.text = "Pick a chest and use Gems for premium boosts"
+        subtitle.font = .rounded(size: 12, weight: .medium)
+        subtitle.textColor = UIColor.white.withAlphaComponent(0.72)
+        subtitle.adjustsFontSizeToFitWidth = true
+        subtitle.minimumScaleFactor = 0.72
+
+        let arrow = UIImageView(image: UIImage(systemName: "chevron.right"))
+        arrow.tintColor = UIColor.white.withAlphaComponent(0.72)
+        arrow.contentMode = .scaleAspectFit
+
+        let textStack = UIStackView(arrangedSubviews: [title, subtitle])
+        textStack.axis = .vertical
+        textStack.spacing = 3
+        textStack.isUserInteractionEnabled = false
+
+        link.addSubview(icon)
+        link.addSubview(textStack)
+        link.addSubview(arrow)
+        icon.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(14)
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(24)
+        }
+        arrow.snp.makeConstraints { make in
+            make.trailing.equalToSuperview().offset(-14)
+            make.centerY.equalToSuperview()
+            make.width.equalTo(12)
+        }
+        textStack.snp.makeConstraints { make in
+            make.leading.equalTo(icon.snp.trailing).offset(12)
+            make.trailing.equalTo(arrow.snp.leading).offset(-12)
+            make.centerY.equalToSuperview()
+        }
+        link.snp.makeConstraints { make in
+            make.height.equalTo(64)
+        }
+        link.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            self.present(BonusViewController(game: self.viewModel.game), animated: true)
+        }, for: .touchUpInside)
+        return link
     }
 
     private func updateRewardBanner() {

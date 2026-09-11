@@ -96,6 +96,7 @@ struct Achievement: Identifiable {
     var currentProgress: Int
     var totalProgress: Int
     var unlocked: Bool
+    var gemReward: Int = 0
 }
 
 enum RewardKind: String, Codable {
@@ -104,12 +105,32 @@ enum RewardKind: String, Codable {
     case cosmetic
 }
 
+enum RewardCurrency: String, Codable {
+    case points
+    case gems
+
+    var title: String {
+        switch self {
+        case .points: return "POINTS"
+        case .gems: return "GEMS"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .points: return "●"
+        case .gems: return "♦"
+        }
+    }
+}
+
 struct RewardItem: Identifiable {
     var id: String
     var title: String
     var description: String
     var iconName: String
     var cost: Int
+    var currency: RewardCurrency = .points
     var kind: RewardKind
     var accentColor: UIColor
 
@@ -124,6 +145,80 @@ struct RewardItem: Identifiable {
 
 extension Notification.Name {
     static let didUpdateRewards = Notification.Name("didUpdateRewards")
+    static let didUpdateWallet = Notification.Name("didUpdateWallet")
+    static let didUpdateEngagement = Notification.Name("didUpdateEngagement")
+    static let didUpdateAchievements = Notification.Name("didUpdateAchievements")
+}
+
+enum AppCurrency: String {
+    case coins
+    case gems
+}
+
+final class AppCurrencyStore {
+    static let shared = AppCurrencyStore()
+
+    private enum Key {
+        static let coins = "walletCoins"
+        static let gems = "walletGems"
+    }
+
+    private let defaults = UserDefaults.standard
+
+    var coins: Int {
+        get {
+            defaults.object(forKey: Key.coins) as? Int ?? MockData.user.coins
+        }
+        set {
+            defaults.set(max(0, newValue), forKey: Key.coins)
+            notifyUpdate()
+        }
+    }
+
+    var gems: Int {
+        get {
+            defaults.object(forKey: Key.gems) as? Int ?? MockData.user.gems
+        }
+        set {
+            defaults.set(max(0, newValue), forKey: Key.gems)
+            notifyUpdate()
+        }
+    }
+
+    func balance(for currency: AppCurrency) -> Int {
+        switch currency {
+        case .coins: return coins
+        case .gems: return gems
+        }
+    }
+
+    @discardableResult
+    func add(_ amount: Int, to currency: AppCurrency) -> Int {
+        guard amount > 0 else { return balance(for: currency) }
+        switch currency {
+        case .coins:
+            coins += amount
+        case .gems:
+            gems += amount
+        }
+        return balance(for: currency)
+    }
+
+    @discardableResult
+    func spend(_ amount: Int, from currency: AppCurrency) -> Bool {
+        guard amount >= 0, balance(for: currency) >= amount else { return false }
+        switch currency {
+        case .coins:
+            coins -= amount
+        case .gems:
+            gems -= amount
+        }
+        return true
+    }
+
+    private func notifyUpdate() {
+        NotificationCenter.default.post(name: .didUpdateWallet, object: nil)
+    }
 }
 
 final class AppRewardsStore {
@@ -153,7 +248,14 @@ final class AppRewardsStore {
     }
 
     func canRedeem(_ item: RewardItem) -> Bool {
-        points >= item.cost && !isRedeemed(item)
+        balance(for: item.currency) >= item.cost && !isRedeemed(item)
+    }
+
+    func balance(for currency: RewardCurrency) -> Int {
+        switch currency {
+        case .points: return points
+        case .gems: return AppCurrencyStore.shared.gems
+        }
     }
 
     func isRedeemed(_ item: RewardItem) -> Bool {
@@ -168,7 +270,12 @@ final class AppRewardsStore {
     @discardableResult
     func redeem(_ item: RewardItem) -> Bool {
         guard canRedeem(item) else { return false }
-        points -= item.cost
+        switch item.currency {
+        case .points:
+            points -= item.cost
+        case .gems:
+            guard AppCurrencyStore.shared.spend(item.cost, from: .gems) else { return false }
+        }
         if item.kind == .cosmetic {
             var ids = ownedRewardIDs
             ids.insert(item.id)
@@ -209,6 +316,143 @@ final class AppRewardsStore {
         set {
             defaults.set(Array(newValue), forKey: Key.ownedRewardIDs)
         }
+    }
+}
+
+struct CheckInResult {
+    let streak: Int
+    let coins: Int
+    let gems: Int
+}
+
+final class AppEngagementStore {
+    static let shared = AppEngagementStore()
+
+    private enum Key {
+        static let lastCheckInDate = "lastCheckInDate"
+        static let checkInStreak = "checkInStreak"
+    }
+
+    private let defaults = UserDefaults.standard
+    private let calendar = Calendar.current
+
+    var streak: Int {
+        defaults.object(forKey: Key.checkInStreak) as? Int ?? MockData.user.checkInStreak
+    }
+
+    var canCheckIn: Bool {
+        guard let lastDate = defaults.object(forKey: Key.lastCheckInDate) as? Date else {
+            return true
+        }
+        return calendar.startOfDay(for: lastDate) != today
+    }
+
+    var nextCheckInReward: (coins: Int, gems: Int, streak: Int) {
+        let nextStreak = canCheckIn ? nextStreakValue : streak
+        let day = ((max(1, nextStreak) - 1) % 7) + 1
+        return (coins: coinsForCheckInDay(day), gems: gemsForCheckInDay(day), streak: nextStreak)
+    }
+
+    @discardableResult
+    func checkIn() -> CheckInResult? {
+        guard canCheckIn else { return nil }
+
+        let nextStreak = nextStreakValue
+        let day = ((max(1, nextStreak) - 1) % 7) + 1
+        let coins = coinsForCheckInDay(day)
+        let gems = gemsForCheckInDay(day)
+
+        AppCurrencyStore.shared.add(coins, to: .coins)
+        AppCurrencyStore.shared.add(gems, to: .gems)
+        defaults.set(today, forKey: Key.lastCheckInDate)
+        defaults.set(nextStreak, forKey: Key.checkInStreak)
+        NotificationCenter.default.post(name: .didUpdateEngagement, object: nil)
+        return CheckInResult(streak: nextStreak, coins: coins, gems: gems)
+    }
+
+    private var today: Date {
+        calendar.startOfDay(for: Date())
+    }
+
+    private var nextStreakValue: Int {
+        guard let lastDate = defaults.object(forKey: Key.lastCheckInDate) as? Date else {
+            return max(1, streak + 1)
+        }
+        let daysSinceLastCheckIn = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: lastDate),
+            to: today
+        ).day ?? 0
+        return daysSinceLastCheckIn == 1 ? streak + 1 : 1
+    }
+
+    private func coinsForCheckInDay(_ day: Int) -> Int {
+        day == 7 ? 1_000 : 250 + (day * 100)
+    }
+
+    private func gemsForCheckInDay(_ day: Int) -> Int {
+        switch day {
+        case 3: return 2
+        case 7: return 5
+        default: return 1
+        }
+    }
+}
+
+final class AppAchievementStore {
+    static let shared = AppAchievementStore()
+
+    private let defaults = UserDefaults.standard
+    private enum Key {
+        static let claimed = "claimedAchievementRewards"
+        static let winStreak = "achievementWinStreak"
+    }
+
+    var currentWinStreak: Int {
+        defaults.object(forKey: Key.winStreak) as? Int ?? 0
+    }
+
+    var achievements: [Achievement] {
+        let streak = currentWinStreak
+        return MockData.achievements.map { achievement in
+            guard achievement.title == "10 Win Streak" || achievement.title == "100 Win Streak" else {
+                return achievement
+            }
+            var updated = achievement
+            updated.currentProgress = min(streak, achievement.totalProgress)
+            updated.unlocked = updated.currentProgress >= updated.totalProgress
+            return updated
+        }
+    }
+
+    @discardableResult
+    func recordSpin(win: Int, hitJackpot: Bool) -> Int {
+        let nextStreak = win > 0 ? currentWinStreak + 1 : 0
+        defaults.set(nextStreak, forKey: Key.winStreak)
+
+        var gemsEarned = 0
+        if hitJackpot {
+            gemsEarned += claim(MockData.achievements[0])
+        }
+        for achievement in MockData.achievements where achievement.title != "First Jackpot" {
+            guard nextStreak >= achievement.totalProgress else { continue }
+            var unlockedAchievement = achievement
+            unlockedAchievement.unlocked = true
+            unlockedAchievement.currentProgress = achievement.totalProgress
+            gemsEarned += claim(unlockedAchievement)
+        }
+        return gemsEarned
+    }
+
+    @discardableResult
+    func claim(_ achievement: Achievement) -> Int {
+        guard achievement.unlocked, achievement.gemReward > 0 else { return 0 }
+        var claimed = Set(defaults.stringArray(forKey: Key.claimed) ?? [])
+        guard claimed.insert(achievement.title).inserted else { return 0 }
+        defaults.set(Array(claimed), forKey: Key.claimed)
+        AppCurrencyStore.shared.add(achievement.gemReward, to: .gems)
+        NotificationCenter.default.post(name: .didUpdateAchievements, object: nil)
+        return achievement.gemReward
     }
 }
 
@@ -329,9 +573,9 @@ enum MockData {
     ]
 
     static let achievements: [Achievement] = [
-        Achievement(title: "First Jackpot", description: "Hit your first jackpot", iconName: "trophy.fill", currentProgress: 1, totalProgress: 1, unlocked: true),
-        Achievement(title: "10 Win Streak", description: "Win 10 rounds in a row", iconName: "flame.fill", currentProgress: 7, totalProgress: 10, unlocked: false),
-        Achievement(title: "100 Win Streak", description: "Win 100 rounds in a row", iconName: "crown.fill", currentProgress: 12, totalProgress: 100, unlocked: false)
+        Achievement(title: "First Jackpot", description: "Hit your first jackpot", iconName: "trophy.fill", currentProgress: 1, totalProgress: 1, unlocked: true, gemReward: 10),
+        Achievement(title: "10 Win Streak", description: "Win 10 rounds in a row", iconName: "flame.fill", currentProgress: 7, totalProgress: 10, unlocked: false, gemReward: 15),
+        Achievement(title: "100 Win Streak", description: "Win 100 rounds in a row", iconName: "crown.fill", currentProgress: 12, totalProgress: 100, unlocked: false, gemReward: 40)
     ]
 
     static let rewardsCatalog: [RewardItem] = [
@@ -341,6 +585,7 @@ enum MockData {
             description: "Your next spin costs no coins.",
             iconName: "ticket.fill",
             cost: 600,
+            currency: .points,
             kind: .bonusTicket,
             accentColor: .brandPink
         ),
@@ -350,6 +595,7 @@ enum MockData {
             description: "Double points from your next spin.",
             iconName: "bolt.fill",
             cost: 300,
+            currency: .points,
             kind: .spinPerk,
             accentColor: .brandGold
         ),
@@ -359,6 +605,7 @@ enum MockData {
             description: "Refund 50% of the bet if your next spin loses.",
             iconName: "shield.lefthalf.filled",
             cost: 800,
+            currency: .points,
             kind: .spinPerk,
             accentColor: .accentCyan
         ),
@@ -368,6 +615,7 @@ enum MockData {
             description: "Improve the win chance on your next spin.",
             iconName: "sparkles",
             cost: 500,
+            currency: .points,
             kind: .spinPerk,
             accentColor: .brandPurple
         ),
@@ -377,6 +625,7 @@ enum MockData {
             description: "Reserve one bonus pick for your next treasure run.",
             iconName: "gift.fill",
             cost: 1_000,
+            currency: .points,
             kind: .bonusTicket,
             accentColor: .accentOrange
         ),
@@ -385,9 +634,50 @@ enum MockData {
             title: "Gold Crown Frame",
             description: "Unlock a premium profile frame.",
             iconName: "crown.fill",
-            cost: 1_500,
+            cost: 80,
+            currency: .gems,
             kind: .cosmetic,
             accentColor: .brandGold
+        ),
+        RewardItem(
+            id: "premiumFreeSpin",
+            title: "Premium Free Spin",
+            description: "Your next spin costs no coins and earns a gem bonus.",
+            iconName: "sparkles",
+            cost: 20,
+            currency: .gems,
+            kind: .bonusTicket,
+            accentColor: .accentCyan
+        ),
+        RewardItem(
+            id: "treasureReroll",
+            title: "Treasure Reroll",
+            description: "Reroll all three treasure chests once.",
+            iconName: "arrow.triangle.2.circlepath",
+            cost: 5,
+            currency: .gems,
+            kind: .bonusTicket,
+            accentColor: .accentCyan
+        ),
+        RewardItem(
+            id: "doubleTreasure",
+            title: "Double Treasure",
+            description: "Double the coins from your next treasure pick.",
+            iconName: "bolt.fill",
+            cost: 12,
+            currency: .gems,
+            kind: .spinPerk,
+            accentColor: .accentOrange
+        ),
+        RewardItem(
+            id: "diamondProfileFrame",
+            title: "Diamond Profile Frame",
+            description: "Unlock an exclusive profile frame.",
+            iconName: "diamond.fill",
+            cost: 150,
+            currency: .gems,
+            kind: .cosmetic,
+            accentColor: .brandPurple
         )
     ]
 
@@ -415,5 +705,9 @@ enum Formatters {
 
     static func points(_ value: Int) -> String {
         "● \(integer.string(from: NSNumber(value: value)) ?? "\(value)")"
+    }
+
+    static func gems(_ value: Int) -> String {
+        "♦ \(integer.string(from: NSNumber(value: value)) ?? "\(value)")"
     }
 }

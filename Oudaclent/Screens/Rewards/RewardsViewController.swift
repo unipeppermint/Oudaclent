@@ -6,7 +6,12 @@ final class RewardsViewController: BaseViewController {
     private let stack = UIStackView()
     private let activeStack = UIStackView()
     private let rewardsStack = UIStackView()
-    private weak var pointsLabel: UILabel?
+    private let currencySegment = UISegmentedControl(items: ["POINTS", "GEMS"])
+    private weak var balanceLabel: UILabel?
+    private weak var balanceCardTitleLabel: UILabel?
+    private weak var balanceCardSubtitleLabel: UILabel?
+    private weak var storeSectionTitleLabel: UILabel?
+    private var selectedCurrency: RewardCurrency = .points
 
     override func loadView() {
         view = PrototypeBackgroundView(style: .light)
@@ -20,6 +25,12 @@ final class RewardsViewController: BaseViewController {
             self,
             selector: #selector(refreshRewards),
             name: .didUpdateRewards,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshRewards),
+            name: .didUpdateWallet,
             object: nil
         )
     }
@@ -55,6 +66,7 @@ final class RewardsViewController: BaseViewController {
         stack.addArrangedSubview(makePointsCard())
         stack.addArrangedSubview(makeSectionTitle("Active Perks"))
         stack.addArrangedSubview(activeStack)
+        stack.addArrangedSubview(makeStoreSegment())
         stack.addArrangedSubview(makeSectionTitle("Points Store"))
         stack.addArrangedSubview(rewardsStack)
         refreshRewards()
@@ -91,12 +103,14 @@ final class RewardsViewController: BaseViewController {
         title.text = "Reward Points"
         title.font = .rounded(size: 18, weight: .black)
         title.textColor = .white
+        balanceCardTitleLabel = title
 
         let subtitle = UILabel()
         subtitle.text = "Earn points from spins, then spend them on perks."
         subtitle.font = .rounded(size: 14, weight: .medium)
         subtitle.textColor = UIColor.white.withAlphaComponent(0.84)
         subtitle.numberOfLines = 2
+        balanceCardSubtitleLabel = subtitle
 
         let points = UILabel()
         points.textAlignment = .right
@@ -104,7 +118,7 @@ final class RewardsViewController: BaseViewController {
         points.textColor = .white
         points.adjustsFontSizeToFitWidth = true
         points.minimumScaleFactor = 0.74
-        pointsLabel = points
+        balanceLabel = points
 
         card.addSubview(icon)
         card.addSubview(title)
@@ -136,12 +150,37 @@ final class RewardsViewController: BaseViewController {
         return card
     }
 
+    private func makeStoreSegment() -> UIView {
+        currencySegment.selectedSegmentIndex = 0
+        currencySegment.selectedSegmentTintColor = .midPurple
+        currencySegment.backgroundColor = UIColor.white.withAlphaComponent(0.82)
+        currencySegment.setTitleTextAttributes(
+            [.foregroundColor: UIColor.textSecondary, .font: UIFont.rounded(size: 12, weight: .black)],
+            for: .normal
+        )
+        currencySegment.setTitleTextAttributes(
+            [.foregroundColor: UIColor.white, .font: UIFont.rounded(size: 12, weight: .black)],
+            for: .selected
+        )
+        currencySegment.addAction(UIAction { [weak self] _ in
+            self?.selectedCurrency = self?.currencySegment.selectedSegmentIndex == 1 ? .gems : .points
+            self?.refreshRewards()
+        }, for: .valueChanged)
+        currencySegment.snp.makeConstraints { make in
+            make.height.equalTo(36)
+        }
+        return currencySegment
+    }
+
     private func makeSectionTitle(_ text: String) -> UIView {
         let container = UIView()
         let label = UILabel()
         label.text = text
         label.font = .rounded(size: 20, weight: .black)
         label.textColor = .midPurple
+        if text == "Points Store" {
+            storeSectionTitleLabel = label
+        }
         container.addSubview(label)
         label.snp.makeConstraints { make in
             make.leading.trailing.centerY.equalToSuperview()
@@ -153,7 +192,15 @@ final class RewardsViewController: BaseViewController {
     }
 
     @objc private func refreshRewards() {
-        pointsLabel?.text = Formatters.points(store.points)
+        let balance = store.balance(for: selectedCurrency)
+        balanceLabel?.text = selectedCurrency == .gems ? Formatters.gems(balance) : Formatters.points(balance)
+        let balanceCardTitle = selectedCurrency == .gems ? "Gems Wallet" : "Reward Points"
+        let balanceCardSubtitle = selectedCurrency == .gems
+            ? "Use Gems for premium bonus boosts and profile styles."
+            : "Earn points from spins, then spend them on perks."
+        balanceCardTitleLabel?.text = balanceCardTitle
+        balanceCardSubtitleLabel?.text = balanceCardSubtitle
+        storeSectionTitleLabel?.text = selectedCurrency == .gems ? "Gems Store" : "Points Store"
         activeStack.arrangedSubviews.forEach { view in
             activeStack.removeArrangedSubview(view)
             view.removeFromSuperview()
@@ -170,7 +217,9 @@ final class RewardsViewController: BaseViewController {
             activeRewards.forEach { activeStack.addArrangedSubview(makeActiveRow($0)) }
         }
 
-        MockData.rewardsCatalog.forEach { item in
+        MockData.rewardsCatalog
+            .filter { $0.currency == selectedCurrency }
+            .forEach { item in
             rewardsStack.addArrangedSubview(makeRewardCard(item))
         }
     }
@@ -286,7 +335,7 @@ final class RewardsViewController: BaseViewController {
 
         let status = makeStatusLabel(for: item)
         let cost = UILabel()
-        cost.text = Formatters.points(item.cost)
+        cost.text = item.currency == .gems ? Formatters.gems(item.cost) : Formatters.points(item.cost)
         cost.font = .rounded(size: 15, weight: .black)
         cost.textColor = .midPurple
         cost.textAlignment = .right
@@ -348,7 +397,7 @@ final class RewardsViewController: BaseViewController {
             label.text = item.kind == .cosmetic ? "OWNED" : "ACTIVE"
             label.textColor = .white
             label.backgroundColor = item.accentColor
-        } else if store.points >= item.cost {
+        } else if store.canRedeem(item) {
             label.text = "REDEEM"
             label.textColor = .white
             label.backgroundColor = .midPurple
@@ -366,11 +415,15 @@ final class RewardsViewController: BaseViewController {
             return
         }
         guard store.redeem(item) else {
-            showMessage(title: "Not Enough Points", message: "Play more spins and complete achievements to earn more points.")
+            let currencyName = item.currency == .gems ? "Gems" : "Points"
+            showMessage(title: "Not Enough \(currencyName)", message: item.currency == .gems
+                ? "Check in, hit jackpots, or complete achievements to earn more Gems."
+                : "Play more spins and complete achievements to earn more points.")
             return
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        showMessage(title: "Redeemed", message: "\(item.title) has been added to your active rewards.")
+        let currencyName = item.currency == .gems ? "Gems" : "Points"
+        showMessage(title: "Redeemed", message: "\(item.title) cost \(item.cost) \(currencyName) and is ready to use.")
     }
 
     private func showMessage(title: String, message: String) {

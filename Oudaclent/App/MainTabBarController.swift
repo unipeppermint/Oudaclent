@@ -69,6 +69,10 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         selectTab(1)
     }
 
+    func showRewards() {
+        selectTab(2)
+    }
+
     func showSettings() {
         selectTab(3)
         guard let navigationController = viewControllers?[3] as? UINavigationController else { return }

@@ -4,6 +4,8 @@ final class ProfileViewController: BaseViewController {
     private let viewModel = ProfileViewModel()
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
+    private weak var coinsValueLabel: UILabel?
+    private weak var gemsValueLabel: UILabel?
     private weak var pointsValueLabel: UILabel?
 
     override func loadView() {
@@ -16,15 +18,21 @@ final class ProfileViewController: BaseViewController {
         setup()
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(refreshPoints),
+            selector: #selector(refreshBalances),
             name: .didUpdateRewards,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshBalances),
+            name: .didUpdateWallet,
             object: nil
         )
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        refreshPoints()
+        refreshBalances()
     }
 
     private func setup() {
@@ -197,6 +205,10 @@ final class ProfileViewController: BaseViewController {
         valueLabel.minimumScaleFactor = 0.68
         if title == "POINTS" {
             pointsValueLabel = valueLabel
+        } else if title == "COINS" {
+            coinsValueLabel = valueLabel
+        } else if title == "GEMS" {
+            gemsValueLabel = valueLabel
         }
 
         let titleLabel = UILabel()
@@ -236,7 +248,9 @@ final class ProfileViewController: BaseViewController {
         return card
     }
 
-    @objc private func refreshPoints() {
+    @objc private func refreshBalances() {
+        coinsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppCurrencyStore.shared.coins))
+        gemsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppCurrencyStore.shared.gems))
         pointsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppRewardsStore.shared.points))
     }
 
@@ -325,9 +339,20 @@ final class ProfileViewController: BaseViewController {
         stack.axis = .horizontal
         stack.spacing = 8
         stack.distribution = .fillEqually
-        stack.addArrangedSubview(makeAchievement(symbol: "7", title: "First Jackpot", state: "Unlocked", unlocked: true))
-        stack.addArrangedSubview(makeAchievement(symbol: "★", title: "10 Win Streak", state: "7/10", unlocked: true))
-        stack.addArrangedSubview(makeAchievement(symbol: "?", title: "100 Win Streak", state: "Locked", unlocked: false))
+        let symbols = ["7", "★", "?"]
+        viewModel.achievements.prefix(3).enumerated().forEach { index, achievement in
+            let state = achievement.unlocked
+                ? (achievement.currentProgress == achievement.totalProgress ? "Unlocked" : "\(achievement.currentProgress)/\(achievement.totalProgress)")
+                : "\(achievement.currentProgress)/\(achievement.totalProgress)"
+            stack.addArrangedSubview(
+                makeAchievement(
+                    symbol: symbols[index],
+                    title: achievement.title,
+                    state: state,
+                    unlocked: achievement.unlocked
+                )
+            )
+        }
         stack.snp.makeConstraints { make in
             make.height.equalTo(112)
         }

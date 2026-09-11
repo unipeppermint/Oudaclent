@@ -209,6 +209,7 @@ final class CheckInBannerView: UIView {
         titleLabel.textColor = .white
         subtitleLabel.font = .caption
         subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.82)
+        subtitleLabel.numberOfLines = 2
 
         dotsStack.axis = .horizontal
         dotsStack.spacing = Spacing.xs
@@ -238,10 +239,20 @@ final class CheckInBannerView: UIView {
         }
     }
 
-    func configure(streak: Int, onCheckIn: (() -> Void)? = nil) {
+    func configure(
+        streak: Int,
+        canCheckIn: Bool = true,
+        nextReward: (coins: Int, gems: Int)? = nil,
+        onCheckIn: (() -> Void)? = nil
+    ) {
         self.onCheckIn = onCheckIn
-        titleLabel.text = "Daily Check-in · Earn Coins"
-        subtitleLabel.text = "7-day streak: 1,000 bonus"
+        let reward = nextReward ?? (coins: 1_000, gems: 1)
+        titleLabel.text = canCheckIn ? "Daily Check-in" : "Checked In Today"
+        subtitleLabel.text = canCheckIn
+            ? "Day \(min(7, max(1, streak)))/7  •  +\(reward.coins) Coins  +\(reward.gems) Gems"
+            : "Come back tomorrow  •  \(streak)-day streak"
+        goButton.title = canCheckIn ? "CLAIM" : "DONE"
+        goButton.setEnabled(canCheckIn)
         dotsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for index in 1...7 {
             let dot = UIView()
