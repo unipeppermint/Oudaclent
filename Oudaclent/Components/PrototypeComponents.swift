@@ -61,6 +61,10 @@ final class SymbolTile: UIView {
         layer.cornerRadius = cornerRadius
         layer.masksToBounds = true
         backgroundColor = gradient == nil ? .white : .clear
+        if gradient != nil {
+            layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
+            layer.borderWidth = 1
+        }
         if let gradientView {
             addSubview(gradientView)
             gradientView.snp.makeConstraints { make in
@@ -70,12 +74,16 @@ final class SymbolTile: UIView {
 
         label.text = symbol.display
         label.textAlignment = .center
-        label.textColor = symbol == .seven ? .white : symbol.color
+        label.textColor = textColor(for: symbol, hasGradient: gradient != nil)
         label.font = .rounded(size: symbol == .bar ? fontSize * 0.38 : fontSize, weight: .black)
         label.numberOfLines = 1
         label.lineBreakMode = .byClipping
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.45
+        label.layer.shadowColor = shadowColor(for: symbol, hasGradient: gradient != nil).cgColor
+        label.layer.shadowOpacity = gradient == nil ? 0 : 0.35
+        label.layer.shadowRadius = 1
+        label.layer.shadowOffset = CGSize(width: 0, height: 1)
         addSubview(label)
         let labelInset = max(2, min(Spacing.xs, fontSize * 0.14))
         label.snp.makeConstraints { make in
@@ -85,6 +93,30 @@ final class SymbolTile: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    private func textColor(for symbol: SlotSymbol, hasGradient: Bool) -> UIColor {
+        guard hasGradient else { return symbol == .seven ? .white : symbol.color }
+        switch symbol {
+        case .seven, .cherry:
+            return .white
+        case .star:
+            return UIColor(hex: "#B45309")
+        case .diamond:
+            return UIColor(hex: "#0E7490")
+        case .bar:
+            return .bgDark
+        }
+    }
+
+    private func shadowColor(for symbol: SlotSymbol, hasGradient: Bool) -> UIColor {
+        guard hasGradient else { return .clear }
+        switch symbol {
+        case .star, .diamond, .bar:
+            return UIColor.white.withAlphaComponent(0.4)
+        case .seven, .cherry:
+            return UIColor.deepPurple.withAlphaComponent(0.28)
+        }
     }
 }
 

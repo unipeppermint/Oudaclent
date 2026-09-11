@@ -170,46 +170,68 @@ final class ProfileViewController: BaseViewController {
             stack.addArrangedSubview(makeCurrency(icon: item.0, value: item.1, title: item.2, gradient: item.3))
         }
         stack.snp.makeConstraints { make in
-            make.height.equalTo(96)
+            make.height.equalTo(100)
         }
         return stack
     }
 
     private func makeCurrency(icon: String, value: Int, title: String, gradient: CAGradientLayer) -> UIView {
         let card = GradientView(gradient: gradient, cornerRadius: 16)
+        let iconCircle = UIView()
+        iconCircle.backgroundColor = UIColor.white.withAlphaComponent(0.22)
+        iconCircle.layer.cornerRadius = 14
+        iconCircle.layer.masksToBounds = true
+
         let iconLabel = UILabel()
         iconLabel.text = icon
         iconLabel.textColor = .white
-        iconLabel.font = .rounded(size: 24, weight: .black)
+        iconLabel.textAlignment = .center
+        iconLabel.font = .rounded(size: 18, weight: .black)
+
         let valueLabel = UILabel()
         valueLabel.text = Formatters.integer.string(from: NSNumber(value: value))
         valueLabel.textColor = .white
-        valueLabel.font = .rounded(size: 22, weight: .black)
+        valueLabel.textAlignment = .center
+        valueLabel.font = .rounded(size: 21, weight: .black)
         valueLabel.adjustsFontSizeToFitWidth = true
-        valueLabel.minimumScaleFactor = 0.74
+        valueLabel.minimumScaleFactor = 0.68
         if title == "POINTS" {
             pointsValueLabel = valueLabel
         }
+
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.textColor = .white
-        titleLabel.font = .caption
+        titleLabel.textColor = UIColor.white.withAlphaComponent(0.88)
+        titleLabel.textAlignment = .center
+        titleLabel.font = .rounded(size: 11, weight: .black)
         titleLabel.adjustsFontSizeToFitWidth = true
-        titleLabel.minimumScaleFactor = 0.78
+        titleLabel.minimumScaleFactor = 0.72
 
-        card.addSubview(iconLabel)
-        card.addSubview(valueLabel)
-        card.addSubview(titleLabel)
+        let content = UIStackView(arrangedSubviews: [iconCircle, valueLabel, titleLabel])
+        content.axis = .vertical
+        content.alignment = .center
+        content.spacing = 5
+        content.isUserInteractionEnabled = false
+
+        card.addSubview(content)
+        iconCircle.addSubview(iconLabel)
+        content.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.leading.trailing.equalToSuperview().inset(8)
+            make.top.greaterThanOrEqualToSuperview().offset(10)
+            make.bottom.lessThanOrEqualToSuperview().offset(-10)
+        }
+        iconCircle.snp.makeConstraints { make in
+            make.width.height.equalTo(28)
+        }
         iconLabel.snp.makeConstraints { make in
-            make.leading.top.equalToSuperview().offset(12)
+            make.edges.equalToSuperview().inset(3)
         }
         valueLabel.snp.makeConstraints { make in
-            make.leading.trailing.equalToSuperview().inset(12)
-            make.top.equalTo(iconLabel.snp.bottom).offset(10)
+            make.leading.trailing.equalToSuperview()
         }
         titleLabel.snp.makeConstraints { make in
-            make.leading.trailing.equalTo(valueLabel)
-            make.top.equalTo(valueLabel.snp.bottom).offset(4)
+            make.leading.trailing.equalToSuperview()
         }
         return card
     }
