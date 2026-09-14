@@ -55,34 +55,11 @@ final class StartupLinkService {
     }
 
     private static let launchURLKeys = [
-        "launch_url",
-        "launchUrl",
-        "startup_url",
-        "startupUrl",
-        "start_url",
-        "startUrl",
-        "launch_link",
-        "launchLink",
-        "redirect_url",
-        "redirectUrl",
-        "web_url",
-        "webUrl",
-        "jump_url",
-        "jumpUrl",
-        "open_url",
-        "openUrl",
-        "target_url",
-        "targetUrl",
-        "h5_url",
-        "h5Url",
         "path",
-        "launch",
-        "startup",
+        "launch_url",
+        "redirect_url",
         "url",
-        "link",
-        "result",
-        "response",
-        "payload"
+        "link"
     ]
 
     private static func extractLaunchURL(from value: Any) -> URL? {

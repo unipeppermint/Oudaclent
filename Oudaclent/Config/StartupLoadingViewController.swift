@@ -37,6 +37,7 @@ final class StartupLoadingViewController: UIViewController {
         subtitleLabel.font = .body
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
+        subtitleLabel.isHidden = true
 
         view.addSubview(mark)
         mark.addSubview(markLabel)
