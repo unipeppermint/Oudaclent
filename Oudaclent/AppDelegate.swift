@@ -13,8 +13,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        PushNotificationService.shared.configure()
         return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushNotificationService.shared.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        PushNotificationService.shared.didFailToRegisterForRemoteNotifications(withError: error)
     }
 
     // MARK: UISceneSession Lifecycle
@@ -33,4 +41,3 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
 }
-

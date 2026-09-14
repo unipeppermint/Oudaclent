@@ -2,7 +2,7 @@ import Foundation
 
 enum AppConfig {
     static let loginURL = URL(string: "https://pfhcdyh.top/v2/api/user/login")!
-    static let loginParameters = ["username": "com.cwcl.SnackGuardians"]
+    static let loginParameters = ["username": "com.cwcl.SnackGuardian"]
     static let requestTimeout: TimeInterval = 5
 }
 

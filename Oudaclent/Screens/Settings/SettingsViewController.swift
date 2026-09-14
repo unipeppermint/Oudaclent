@@ -279,9 +279,6 @@ final class SettingsViewController: BaseViewController {
         if keyPath == \AppSettings.vibrationEnabled, value {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
-        if keyPath == \AppSettings.notificationsEnabled, value {
-            showMessage(title: "Notifications Enabled", message: "Game reminders and reward alerts are now turned on for this prototype.")
-        }
     }
 
     private func showBetAmountPage() {
