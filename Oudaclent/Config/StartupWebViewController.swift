@@ -5,7 +5,7 @@ final class StartupWebViewController: UIViewController {
     private enum ScriptBridge {
         static let openSafari = "openSafari"
         static let open = "open"
-        static let all = [openSafari, open]
+        static let all = [openSafari, open, IOSWebBridge.handlerName]
     }
 
     private let initialURL: URL
@@ -25,6 +25,11 @@ final class StartupWebViewController: UIViewController {
         let contentController = WKUserContentController()
         let messageHandler = WeakWebScriptMessageHandler(target: self)
         ScriptBridge.all.forEach { contentController.add(messageHandler, name: $0) }
+        contentController.addUserScript(WKUserScript(
+            source: IOSWebBridge.script,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         configuration.userContentController = contentController
         configuredUserContentController = contentController
 
@@ -67,14 +72,14 @@ final class StartupWebViewController: UIViewController {
     }
 
     private func saveCurrentURL() {
-        guard let url = webView.url else { return }
+        guard AppConfig.startupURLOverride == nil, let url = webView.url else { return }
         StartupLinkStore.shared.save(url: url)
     }
 
     private func openExternalBrowser(with body: Any) {
         guard let url = externalWebURL(from: body) else {
 #if DEBUG
-            print("[StartupWebViewController] invalid external URL message: \(body)")
+            print("[StartupWebViewController] invalid external URL message")
 #endif
             return
         }
@@ -151,7 +156,25 @@ extension StartupWebViewController: WKUIDelegate {
 
 extension StartupWebViewController: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame else { return }
         switch message.name {
+        case IOSWebBridge.handlerName:
+            do {
+                let request = try WebBridgeMessage(body: message.body)
+                if request.action == .openWindow {
+                    guard let url = request.externalURL else {
+                        FacebookEventService.debugLog("Rejected invalid openWindow URL")
+                        return
+                    }
+                    UIApplication.shared.open(url, options: [:]) { success in
+                        if !success { FacebookEventService.debugLog("External browser open failed") }
+                    }
+                } else {
+                    FacebookEventService.shared.log(try request.event())
+                }
+            } catch {
+                FacebookEventService.debugLog("Rejected bridge message: \(error)")
+            }
         case ScriptBridge.openSafari, ScriptBridge.open:
             openExternalBrowser(with: message.body)
         default:

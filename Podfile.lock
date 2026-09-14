@@ -1,5 +1,11 @@
 PODS:
   - Alamofire (5.12.2)
+  - FBAEMKit (18.1.1):
+    - FBSDKCoreKit_Basics (= 18.1.1)
+  - FBSDKCoreKit (18.1.1):
+    - FBAEMKit (= 18.1.1)
+    - FBSDKCoreKit_Basics (= 18.1.1)
+  - FBSDKCoreKit_Basics (18.1.1)
   - FirebaseCore (11.15.0):
     - FirebaseCoreInternal (~> 11.15.0)
     - GoogleUtilities/Environment (~> 8.1)
@@ -57,12 +63,16 @@ PODS:
 
 DEPENDENCIES:
   - Alamofire (~> 5.10)
+  - FBSDKCoreKit (= 18.1.1)
   - FirebaseMessaging (~> 11.0)
   - SnapKit (~> 5.7)
 
 SPEC REPOS:
   trunk:
     - Alamofire
+    - FBAEMKit
+    - FBSDKCoreKit
+    - FBSDKCoreKit_Basics
     - FirebaseCore
     - FirebaseCoreInternal
     - FirebaseInstallations
@@ -75,6 +85,9 @@ SPEC REPOS:
 
 SPEC CHECKSUMS:
   Alamofire: c5f37d8f438dc1d7fd3ff767f2f80fd01ca381d7
+  FBAEMKit: fbb0a50e13109400d0615e7630a0db26ec6b8206
+  FBSDKCoreKit: 0063014b3b1f7e975e70b60232b0cf8003839746
+  FBSDKCoreKit_Basics: f4a1e0f38769eb71abaf6395b85e015318fcda49
   FirebaseCore: efb3893e5b94f32b86e331e3bd6dadf18b66568e
   FirebaseCoreInternal: 9afa45b1159304c963da48addb78275ef701c6b4
   FirebaseInstallations: 317270fec08a5d418fdbc8429282238cab3ac843
@@ -85,6 +98,6 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   SnapKit: d612e99e678a2d3b95bf60b0705ed0a35c03484a
 
-PODFILE CHECKSUM: 21d4c8b591cb5dbf7fe3f6594c17280e1f443c24
+PODFILE CHECKSUM: 5f69c5d1aac389f82357b1a9e0e41b618e2cb655
 
 COCOAPODS: 1.17.0

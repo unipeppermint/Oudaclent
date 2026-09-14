@@ -18,6 +18,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = StartupLoadingViewController()
         window.makeKeyAndVisible()
         loadStartupDestination()
+        FacebookEventService.shared.handleOpenURLContexts(connectionOptions.urlContexts)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        FacebookEventService.shared.handleOpenURLContexts(URLContexts)
     }
 
     private func loadStartupDestination() {
@@ -58,6 +63,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
+        TrackingAuthorizationCoordinator.shared.applicationDidBecomeActive()
         // Called when the scene has moved from an inactive state to an active state.
         // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
     }

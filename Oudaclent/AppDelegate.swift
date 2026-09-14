@@ -13,7 +13,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        PushNotificationService.shared.configure()
+        FacebookEventService.shared.configure(application: application, launchOptions: launchOptions)
+        PushNotificationService.shared.configure(requestPermission: false)
         return true
     }
 

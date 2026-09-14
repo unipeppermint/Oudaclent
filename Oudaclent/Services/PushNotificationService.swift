@@ -30,7 +30,7 @@ final class PushNotificationService: NSObject {
         super.init()
     }
 
-    func configure() {
+    func configure(requestPermission: Bool = true) {
         guard !isConfigured else { return }
 
         notificationCenter.delegate = self
@@ -45,6 +45,7 @@ final class PushNotificationService: NSObject {
         Messaging.messaging().isAutoInitEnabled = true
         isConfigured = true
 
+        guard requestPermission else { return }
         requestAuthorization { status in
             if status == .denied {
                 print("[Push] Notification permission is denied.")
