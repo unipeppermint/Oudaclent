@@ -15,7 +15,6 @@ final class SettingsViewController: BaseViewController {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setup()
-        NotificationCenter.default.addObserver(self, selector: #selector(refreshNotificationToggle), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -280,33 +279,15 @@ final class SettingsViewController: BaseViewController {
     }
 
     private func updateToggle(_ toggle: UISwitch, keyPath: WritableKeyPath<AppSettings, Bool>, value: Bool) {
-        if keyPath == \AppSettings.notificationsEnabled {
-            toggle.isEnabled = false
-            PushNotificationService.shared.setEnabled(value) { [weak self, weak toggle] status in
-                toggle?.isEnabled = true
-                toggle?.setOn(status == .authorized, animated: true)
-                guard value, status != .authorized, let self else { return }
-                let alert = UIAlertController(title: "Notifications Unavailable", message: status == .unavailable ? "Push notifications are not configured for this build." : "Allow notifications for this app in system Settings.", preferredStyle: .alert)
-                if status != .unavailable {
-                    alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
-                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-                    })
-                }
-                alert.addAction(UIAlertAction(title: "OK", style: .cancel))
-                self.present(alert, animated: true)
-            }
-            return
-        }
+        // Notifications is a presentation-only preference, independent of Firebase/APNs.
         viewModel.set(value, for: keyPath)
         if keyPath == \AppSettings.vibrationEnabled, value {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
-    @objc private func refreshNotificationToggle() {
-        PushNotificationService.shared.refreshAuthorization { [weak self] enabled in
-            self?.notificationToggle?.setOn(enabled, animated: false)
-        }
+    private func refreshNotificationToggle() {
+        notificationToggle?.setOn(viewModel.settings.notificationsEnabled, animated: false)
     }
 
     private func showBetAmountPage() {

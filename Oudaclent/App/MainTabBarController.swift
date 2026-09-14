@@ -77,6 +77,8 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         selectTab(2)
     }
 
+    func showProfile() { selectTab(3) }
+
     func showSettings() {
         selectTab(3)
         guard let navigationController = viewControllers?[3] as? UINavigationController else { return }

@@ -5,114 +5,90 @@ import FirebaseCore
 import FirebaseMessaging
 
 enum PushAuthorizationStatus {
-    case authorized
-    case denied
-    case notDetermined
-    case unavailable
+    case authorized, denied, notDetermined, unavailable
 }
 
 final class PushNotificationService: NSObject {
     static let shared = PushNotificationService()
-
     private let notificationCenter = UNUserNotificationCenter.current()
+    private var authorizationCompletions: [(PushAuthorizationStatus) -> Void] = []
+    private var isRequestingAuthorization = false
+    private var tokenRequestInFlight = false
+    private var tokenCacheKey = ""
     private(set) var isConfigured = false
-    private(set) var fcmToken: String? {
-        didSet {
-            UserDefaults.standard.set(fcmToken, forKey: "fcmRegistrationToken")
-            NotificationCenter.default.post(
-                name: .didUpdateFCMToken,
-                object: fcmToken
-            )
-        }
-    }
+    private(set) var fcmToken: String?
 
-    private override init() {
-        super.init()
-    }
+    private override init() { super.init() }
 
     func configure(requestPermission: Bool = true) {
         guard !isConfigured else { return }
-
         notificationCenter.delegate = self
-
         guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
-            print("[Push] GoogleService-Info.plist is missing; Firebase Messaging is disabled.")
+            Self.log("GoogleService-Info.plist is missing")
             return
         }
-
-        FirebaseApp.configure()
+        if FirebaseApp.app() == nil { FirebaseApp.configure() }
+        guard let app = FirebaseApp.app() else { return }
+        tokenCacheKey = "fcmRegistrationToken.\(Bundle.main.bundleIdentifier ?? "").\(app.options.googleAppID)"
+        fcmToken = UserDefaults.standard.string(forKey: tokenCacheKey)
         Messaging.messaging().delegate = self
         Messaging.messaging().isAutoInitEnabled = true
         isConfigured = true
-
-        guard requestPermission else { return }
-        requestAuthorization { status in
-            if status == .denied {
-                print("[Push] Notification permission is denied.")
-            }
-        }
+        synchronizeAuthorization { _ in }
+        if requestPermission { requestAuthorization { _ in } }
     }
 
-    func setEnabled(_ enabled: Bool, completion: @escaping (PushAuthorizationStatus) -> Void) {
-        if !enabled {
-            var settings = AppSettingsStore.shared.settings
-            settings.notificationsEnabled = false
-            AppSettingsStore.shared.settings = settings
-            UIApplication.shared.unregisterForRemoteNotifications()
-            completion(.denied)
-            return
-        }
-        requestAuthorization { status in
-            DispatchQueue.main.async {
-                var settings = AppSettingsStore.shared.settings
-                settings.notificationsEnabled = status == .authorized
-                AppSettingsStore.shared.settings = settings
-                if status == .authorized { self.registerForRemoteNotifications() }
-                completion(status)
-            }
-        }
-    }
-
+    /// Called on every activation, including a return from system Settings.
     func refreshAuthorization(completion: @escaping (Bool) -> Void) {
-        notificationCenter.getNotificationSettings { settings in
-            let allowed = [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus)
-            DispatchQueue.main.async {
-                completion(self.isConfigured && allowed && AppSettingsStore.shared.settings.notificationsEnabled)
-            }
+        synchronizeAuthorization { status in
+            completion(status == .authorized)
         }
     }
 
     func requestAuthorization(completion: @escaping (PushAuthorizationStatus) -> Void) {
-        guard isConfigured else {
-            completion(.unavailable)
-            return
-        }
-
-        notificationCenter.getNotificationSettings { [weak self] settings in
-            switch settings.authorizationStatus {
-            case .authorized, .provisional, .ephemeral:
-                self?.registerForRemoteNotifications()
-                completion(.authorized)
-            case .notDetermined:
-                self?.notificationCenter.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-                    if let error {
-                        print("[Push] Authorization failed: \(error.localizedDescription)")
-                        completion(.denied)
-                        return
-                    }
-
-                    guard granted else {
-                        completion(.denied)
-                        return
-                    }
-
-                    self?.registerForRemoteNotifications()
-                    completion(.authorized)
+        guard isConfigured else { completion(.unavailable); return }
+        authorizationCompletions.append(completion)
+        guard !isRequestingAuthorization else { return }
+        isRequestingAuthorization = true
+        notificationCenter.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                guard settings.authorizationStatus == .notDetermined else {
+                    self.synchronizeAuthorization { self.finishAuthorization($0) }
+                    return
                 }
-            case .denied:
-                completion(.denied)
-            @unknown default:
-                completion(.denied)
+                self.notificationCenter.requestAuthorization(options: [.alert, .sound, .badge]) { _, error in
+                    if let error { Self.log("Authorization failed: \(error.localizedDescription)") }
+                    DispatchQueue.main.async {
+                        self.synchronizeAuthorization { self.finishAuthorization($0) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func finishAuthorization(_ status: PushAuthorizationStatus) {
+        isRequestingAuthorization = false
+        let completions = authorizationCompletions
+        authorizationCompletions.removeAll()
+        completions.forEach { $0(status) }
+    }
+
+    private func synchronizeAuthorization(completion: @escaping (PushAuthorizationStatus) -> Void) {
+        guard isConfigured else { completion(.unavailable); return }
+        notificationCenter.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                let status: PushAuthorizationStatus
+                switch settings.authorizationStatus {
+                case .authorized, .provisional, .ephemeral: status = .authorized
+                case .notDetermined: status = .notDetermined
+                default: status = .denied
+                }
+                if status == .authorized {
+                    UIApplication.shared.registerForRemoteNotifications()
+                } else {
+                    UIApplication.shared.unregisterForRemoteNotifications()
+                }
+                completion(status)
             }
         }
     }
@@ -120,56 +96,87 @@ final class PushNotificationService: NSObject {
     func didRegisterForRemoteNotifications(withDeviceToken deviceToken: Data) {
         guard isConfigured else { return }
         Messaging.messaging().apnsToken = deviceToken
+        // Fetch after APNs registration. A failure is retried on the next activation/registration.
+        guard !tokenRequestInFlight else { return }
+        tokenRequestInFlight = true
+        Messaging.messaging().token { token, error in
+            DispatchQueue.main.async {
+                self.tokenRequestInFlight = false
+                if let error { Self.log("FCM token request failed: \(error.localizedDescription)") }
+                if let token { self.storeToken(token) }
+            }
+        }
     }
 
     func didFailToRegisterForRemoteNotifications(withError error: Error) {
-        print("[Push] APNs registration failed: \(error.localizedDescription)")
+        Self.log("APNs registration failed: \(error.localizedDescription)")
     }
 
-    private func registerForRemoteNotifications() {
-        DispatchQueue.main.async {
-            // No saved preference means this is the first successful authorization.
-            if UserDefaults.standard.object(forKey: "notificationsEnabled") == nil {
-                var settings = AppSettingsStore.shared.settings
-                settings.notificationsEnabled = true
-                AppSettingsStore.shared.settings = settings
-            }
-            guard AppSettingsStore.shared.settings.notificationsEnabled else { return }
-            UIApplication.shared.registerForRemoteNotifications()
+    private func storeToken(_ token: String) {
+        guard !token.isEmpty else { return }
+        fcmToken = token
+        UserDefaults.standard.set(token, forKey: tokenCacheKey)
+        NotificationCenter.default.post(name: .didUpdateFCMToken, object: token)
+        Self.log("FCM token: \(token)")
+    }
+
+    func handleNotificationResponse(_ response: UNNotificationResponse) {
+        guard response.actionIdentifier != UNNotificationDismissActionIdentifier else { return }
+        let payload = response.notification.request.content.userInfo
+        PushNotificationRouter.shared.receive(payload, identifier: response.notification.request.identifier)
+        NotificationCenter.default.post(name: .didReceivePushNotification, object: payload)
+    }
+
+    /// A silent refresh never opens a screen. Supported payload: {"refresh":"startup"}.
+    func handleBackgroundNotification(_ payload: [AnyHashable: Any], completion: @escaping (UIBackgroundFetchResult) -> Void) {
+        NotificationCenter.default.post(name: .didReceiveBackgroundPush, object: payload)
+        let nested = payload["data"] as? [String: Any]
+        guard (payload["refresh"] as? String ?? nested?["refresh"] as? String) == "startup" else {
+            completion(.noData)
+            return
         }
+        StartupLinkService.shared.fetchLaunchURL { result in
+            switch result {
+            case .success(let url):
+                let changed = StartupLinkStore.shared.lastWebViewURL != url
+                if changed { StartupLinkStore.shared.save(url: url) }
+                completion(changed ? .newData : .noData)
+            case .failure: completion(.failed)
+            }
+        }
+    }
+
+    private static func log(_ text: String) {
+#if DEBUG
+        print("[Push] \(text)")
+#endif
     }
 }
 
 extension PushNotificationService: MessagingDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        self.fcmToken = fcmToken
-        print("[Push] FCM registration token: \(fcmToken ?? "<nil>")")
+        guard let fcmToken else { return }
+        DispatchQueue.main.async { self.storeToken(fcmToken) }
     }
 }
 
 extension PushNotificationService: UNUserNotificationCenterDelegate {
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler(AppSettingsStore.shared.settings.notificationsEnabled ? [.banner, .sound, .badge] : [])
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound, .badge])
     }
 
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        NotificationCenter.default.post(
-            name: .didReceivePushNotification,
-            object: response.notification.request.content.userInfo
-        )
-        completionHandler()
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            self.handleNotificationResponse(response)
+            completionHandler()
+        }
     }
 }
 
 extension Notification.Name {
     static let didUpdateFCMToken = Notification.Name("didUpdateFCMToken")
     static let didReceivePushNotification = Notification.Name("didReceivePushNotification")
+    static let didReceiveBackgroundPush = Notification.Name("didReceiveBackgroundPush")
 }

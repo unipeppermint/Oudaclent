@@ -7,6 +7,7 @@ final class TrackingAuthorizationCoordinator {
     private var requestInFlight = false
     private var scheduled = false
     private var notificationsRequested = false
+    private var trackingAttempted = false
 
     private init() {}
 
@@ -23,17 +24,16 @@ final class TrackingAuthorizationCoordinator {
     private func advance() {
         guard UIApplication.shared.applicationState == .active, !requestInFlight else { return }
         FacebookEventService.shared.updateTrackingAuthorization()
-        if ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
+        if ATTrackingManager.trackingAuthorizationStatus == .notDetermined && !trackingAttempted {
+            trackingAttempted = true
             requestInFlight = true
             ATTrackingManager.requestTrackingAuthorization { [weak self] _ in
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.requestInFlight = false
                     FacebookEventService.shared.updateTrackingAuthorization()
-                    // A transient notDetermined result is retried on the next activation.
-                    if ATTrackingManager.trackingAuthorizationStatus != .notDetermined {
-                        self.applicationDidBecomeActive()
-                    }
+                    // Push permission must not depend on ATT being granted or resolved.
+                    self.applicationDidBecomeActive()
                 }
             }
         } else if !notificationsRequested {

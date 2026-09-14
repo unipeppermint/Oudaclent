@@ -17,6 +17,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         self.window = window
         window.rootViewController = StartupLoadingViewController()
         window.makeKeyAndVisible()
+        let router = PushNotificationRouter.shared
+        router.isReady = false
+        router.onDestination = { [weak self] destination in self?.openPushDestination(destination) }
+        if let response = connectionOptions.notificationResponse {
+            PushNotificationService.shared.handleNotificationResponse(response)
+        }
         loadStartupDestination()
         FacebookEventService.shared.handleOpenURLContexts(connectionOptions.urlContexts)
     }
@@ -43,8 +49,41 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                         self.showMainApp()
                     }
                 }
+                PushNotificationRouter.shared.isReady = true
             }
         }
+    }
+
+    private func openPushDestination(_ destination: PushDestination) {
+        if let root = window?.rootViewController, root.presentedViewController != nil {
+            root.dismiss(animated: false) { [weak self] in self?.applyPushDestination(destination) }
+        } else {
+            applyPushDestination(destination)
+        }
+    }
+
+    private func applyPushDestination(_ destination: PushDestination) {
+        if let url = destination.url {
+            showStartupWebView(url: url)
+            return
+        }
+        guard let screen = destination.screen else { return }
+        // Unknown game IDs must not discard the user's current screen.
+        if screen == .game, let id = destination.gameID,
+           !MockData.hotSlots.contains(where: { $0.id == id }) { return }
+        let tabs = window?.rootViewController as? MainTabBarController ?? MainTabBarController()
+        if window?.rootViewController !== tabs { window?.rootViewController = tabs }
+        tabs.loadViewIfNeeded()
+        switch screen {
+        case .lobby: tabs.showLobby()
+        case .rewards: tabs.showRewards()
+        case .profile: tabs.showProfile()
+        case .game:
+            if let id = destination.gameID, let game = MockData.hotSlots.first(where: { $0.id == id }) {
+                tabs.showGame(game)
+            } else { tabs.showGame() }
+        }
+        (tabs.selectedViewController as? UINavigationController)?.popToRootViewController(animated: false)
     }
 
     private func showStartupWebView(url: URL) {
@@ -63,6 +102,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
+        PushNotificationService.shared.refreshAuthorization { _ in }
+        UIApplication.shared.applicationIconBadgeNumber = 0
         TrackingAuthorizationCoordinator.shared.applicationDidBecomeActive()
         // Called when the scene has moved from an inactive state to an active state.
         // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.

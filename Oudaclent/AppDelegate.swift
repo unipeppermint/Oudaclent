@@ -26,6 +26,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         PushNotificationService.shared.didFailToRegisterForRemoteNotifications(withError: error)
     }
 
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        PushNotificationService.shared.handleBackgroundNotification(userInfo, completion: completionHandler)
+    }
+
     // MARK: UISceneSession Lifecycle
 
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
