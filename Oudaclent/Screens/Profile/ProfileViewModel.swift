@@ -8,7 +8,7 @@ final class ProfileViewModel {
         user.points = AppRewardsStore.shared.points
         return user
     }
-    let slots = Array(MockData.hotSlots.prefix(2))
+    let slots = MockData.hotSlots
 
     var achievements: [Achievement] {
         AppAchievementStore.shared.achievements

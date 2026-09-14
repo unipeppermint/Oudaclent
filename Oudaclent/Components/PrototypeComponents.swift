@@ -222,6 +222,7 @@ private final class FloatingTabItemView: UIControl {
     }
 
     private func setup() {
+        selectedBackground.isUserInteractionEnabled = false
         selectedBackground.isHidden = true
         addSubview(selectedBackground)
         selectedBackground.snp.makeConstraints { make in
@@ -343,6 +344,7 @@ final class LobbySlotRowView: UIControl {
         playLabel.textColor = .white
         playLabel.textAlignment = .center
 
+        iconTile.isUserInteractionEnabled = false
         addSubview(iconTile)
         addSubview(titleLabel)
         addSubview(tagLabel)
@@ -440,7 +442,7 @@ final class LobbySlotRowView: UIControl {
         [
             ("Reels", "\(game.reels)"),
             ("Lines", "\(game.paylines)"),
-            ("Min Bet", "\(game.minBet)")
+            ("Min Coins", "\(game.minBet)")
         ].forEach { item in
             metaStack.addArrangedSubview(makeMetaPill(title: item.0, value: item.1))
         }
@@ -551,6 +553,7 @@ final class LobbySlotCardView: UIControl {
         applyCardShadow()
         addPressAnimation()
 
+        hero.isUserInteractionEnabled = false
         hero.layer.cornerRadius = 24
         hero.layer.cornerCurve = .continuous
         hero.layer.masksToBounds = true
@@ -693,7 +696,7 @@ final class LobbySlotCardView: UIControl {
         [
             ("Reels", "\(game.reels)"),
             ("Lines", "\(game.paylines)"),
-            ("Min Bet", "\(game.minBet)")
+            ("Min Coins", "\(game.minBet)")
         ].forEach { item in
             metaStack.addArrangedSubview(makeMetaPill(title: item.0, value: item.1))
         }

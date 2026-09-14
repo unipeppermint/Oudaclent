@@ -4,6 +4,9 @@ final class ProfileViewController: BaseViewController {
     private let viewModel = ProfileViewModel()
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
+    private weak var avatarView: UIView?
+    private weak var avatarSymbol: UILabel?
+    private weak var achievementCards: UIView?
     private weak var coinsValueLabel: UILabel?
     private weak var gemsValueLabel: UILabel?
     private weak var pointsValueLabel: UILabel?
@@ -61,7 +64,9 @@ final class ProfileViewController: BaseViewController {
         contentStack.addArrangedSubview(makeSectionHeader(title: "Achievements", action: "View All >") { [weak self] in
             self?.showAchievementsPage()
         })
-        contentStack.addArrangedSubview(makeAchievements())
+        let achievements = makeAchievements()
+        achievementCards = achievements
+        contentStack.addArrangedSubview(achievements)
     }
 
     private func showMySlotsPage() {
@@ -73,7 +78,7 @@ final class ProfileViewController: BaseViewController {
 
     private func showAchievementsPage() {
         navigationController?.pushViewController(
-            AchievementsListViewController(achievements: viewModel.achievements),
+            AchievementsListViewController(),
             animated: true
         )
     }
@@ -110,9 +115,11 @@ final class ProfileViewController: BaseViewController {
         card.applySoftShadow()
 
         let avatar = GradientView(gradient: PrototypeGradient.pinkPurple(), cornerRadius: 40)
+        avatarView = avatar
         avatar.layer.borderWidth = 3
         avatar.layer.borderColor = UIColor.brandGold.cgColor
         let face = UILabel()
+        avatarSymbol = face
         face.text = "☺"
         face.font = .rounded(size: 36, weight: .black)
         face.textColor = .brandGold
@@ -249,6 +256,16 @@ final class ProfileViewController: BaseViewController {
     }
 
     @objc private func refreshBalances() {
+        let frame = AppRewardsStore.shared.profileFrame
+        avatarView?.layer.borderColor = (frame?.accentColor ?? .brandGold).cgColor
+        avatarSymbol?.text = frame?.id == "diamondProfileFrame" ? "♦" : (frame == nil ? "☺" : "♛")
+        if let previous = achievementCards, let index = contentStack.arrangedSubviews.firstIndex(of: previous) {
+            contentStack.removeArrangedSubview(previous)
+            previous.removeFromSuperview()
+            let updated = makeAchievements()
+            achievementCards = updated
+            contentStack.insertArrangedSubview(updated, at: index)
+        }
         coinsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppCurrencyStore.shared.coins))
         gemsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppCurrencyStore.shared.gems))
         pointsValueLabel?.text = Formatters.integer.string(from: NSNumber(value: AppRewardsStore.shared.points))
@@ -288,20 +305,29 @@ final class ProfileViewController: BaseViewController {
         stack.axis = .horizontal
         stack.spacing = 10
         stack.distribution = .fillEqually
-        stack.addArrangedSubview(makeMiniSlot(title: "Lucky 7", subtitle: "Max x1000", symbol: .seven))
-        stack.addArrangedSubview(makeMiniSlot(title: "Sweet Candy", subtitle: "Free Spin x10", symbol: .cherry))
+        for game in viewModel.slots.prefix(2) {
+            stack.addArrangedSubview(makeMiniSlot(game: game))
+        }
         stack.snp.makeConstraints { make in
             make.height.equalTo(116)
         }
         return stack
     }
 
-    private func makeMiniSlot(title: String, subtitle: String, symbol: SlotSymbol) -> UIView {
-        let card = UIView()
+    private func makeMiniSlot(game: SlotGame) -> UIView {
+        let title = game.title
+        let subtitle = "Min Coins \(game.minBet)"
+        let symbol = game.symbolSet.first ?? .seven
+        let card = UIControl()
+        card.addAction(UIAction { [weak self] _ in
+            (self?.tabBarController as? MainTabBarController)?.showGame(game)
+        }, for: .touchUpInside)
+        card.addPressAnimation()
         card.backgroundColor = .white
         card.layer.cornerRadius = 18
         card.applySoftShadow()
         let tile = SymbolTile(symbol: symbol, gradient: PrototypeGradient.seven(), cornerRadius: 12, fontSize: 31)
+        tile.isUserInteractionEnabled = false
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .rounded(size: 17, weight: .black)
@@ -414,12 +440,11 @@ final class ProfileViewController: BaseViewController {
 }
 
 private final class AchievementsListViewController: BaseViewController {
-    private let achievements: [Achievement]
+    private var achievements: [Achievement] { AppAchievementStore.shared.achievements }
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
 
-    init(achievements: [Achievement]) {
-        self.achievements = achievements
+    init() {
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -435,6 +460,24 @@ private final class AchievementsListViewController: BaseViewController {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setup()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        contentStack.arrangedSubviews.dropFirst().forEach {
+            contentStack.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        addAchievementCards()
+    }
+
+    private func addAchievementCards() {
+        achievements.forEach { achievement in
+            let card = AchievementCardView()
+            card.configure(ach: achievement)
+            card.snp.makeConstraints { $0.height.equalTo(104) }
+            contentStack.addArrangedSubview(card)
+        }
     }
 
     private func setup() {
@@ -456,14 +499,7 @@ private final class AchievementsListViewController: BaseViewController {
         contentStack.addArrangedSubview(makeTopBar())
         contentStack.setCustomSpacing(24, after: contentStack.arrangedSubviews.last!)
 
-        achievements.forEach { achievement in
-            let card = AchievementCardView()
-            card.configure(ach: achievement)
-            card.snp.makeConstraints { make in
-                make.height.equalTo(104)
-            }
-            contentStack.addArrangedSubview(card)
-        }
+
     }
 
     private func makeTopBar() -> UIView {

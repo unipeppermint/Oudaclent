@@ -56,6 +56,7 @@ final class PrimaryButton: UIControl {
     }
 
     private func setup() {
+        backgroundView.isUserInteractionEnabled = false
         addSubview(backgroundView)
         backgroundView.snp.makeConstraints { make in
             make.edges.equalToSuperview()

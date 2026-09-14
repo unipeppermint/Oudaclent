@@ -53,6 +53,35 @@ final class PushNotificationService: NSObject {
         }
     }
 
+    func setEnabled(_ enabled: Bool, completion: @escaping (PushAuthorizationStatus) -> Void) {
+        if !enabled {
+            var settings = AppSettingsStore.shared.settings
+            settings.notificationsEnabled = false
+            AppSettingsStore.shared.settings = settings
+            UIApplication.shared.unregisterForRemoteNotifications()
+            completion(.denied)
+            return
+        }
+        requestAuthorization { status in
+            DispatchQueue.main.async {
+                var settings = AppSettingsStore.shared.settings
+                settings.notificationsEnabled = status == .authorized
+                AppSettingsStore.shared.settings = settings
+                if status == .authorized { self.registerForRemoteNotifications() }
+                completion(status)
+            }
+        }
+    }
+
+    func refreshAuthorization(completion: @escaping (Bool) -> Void) {
+        notificationCenter.getNotificationSettings { settings in
+            let allowed = [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus)
+            DispatchQueue.main.async {
+                completion(self.isConfigured && allowed && AppSettingsStore.shared.settings.notificationsEnabled)
+            }
+        }
+    }
+
     func requestAuthorization(completion: @escaping (PushAuthorizationStatus) -> Void) {
         guard isConfigured else {
             completion(.unavailable)
@@ -99,6 +128,13 @@ final class PushNotificationService: NSObject {
 
     private func registerForRemoteNotifications() {
         DispatchQueue.main.async {
+            // No saved preference means this is the first successful authorization.
+            if UserDefaults.standard.object(forKey: "notificationsEnabled") == nil {
+                var settings = AppSettingsStore.shared.settings
+                settings.notificationsEnabled = true
+                AppSettingsStore.shared.settings = settings
+            }
+            guard AppSettingsStore.shared.settings.notificationsEnabled else { return }
             UIApplication.shared.registerForRemoteNotifications()
         }
     }
@@ -117,7 +153,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound, .badge])
+        completionHandler(AppSettingsStore.shared.settings.notificationsEnabled ? [.banner, .sound, .badge] : [])
     }
 
     func userNotificationCenter(

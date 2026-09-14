@@ -4,6 +4,7 @@ final class SettingsViewController: BaseViewController {
     private let viewModel = SettingsViewModel()
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
+    private weak var notificationToggle: UISwitch?
     private weak var betValueLabel: UILabel?
 
     override func loadView() {
@@ -14,11 +15,13 @@ final class SettingsViewController: BaseViewController {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
         setup()
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshNotificationToggle), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         betValueLabel?.text = "\(viewModel.settings.betAmount) Coins"
+        refreshNotificationToggle()
     }
 
     private func setup() {
@@ -109,7 +112,7 @@ final class SettingsViewController: BaseViewController {
         let rows = UIStackView()
         rows.axis = .vertical
         let betText = "\(viewModel.settings.betAmount) Coins"
-        rows.addArrangedSubview(makeNavigationRow(symbolName: "star.fill", title: "Bet Amount", value: betText, color: .brandGold) { [weak self] in
+        rows.addArrangedSubview(makeNavigationRow(symbolName: "star.fill", title: "Coins per Spin", value: betText, color: .brandGold) { [weak self] in
             self?.showBetAmountPage()
         } valueLabelHandler: { [weak self] label in
             self?.betValueLabel = label
@@ -158,6 +161,7 @@ final class SettingsViewController: BaseViewController {
 
     private func makeIcon(symbolName: String, color: UIColor, size: CGFloat = 28) -> UIView {
         let container = UIView()
+        container.isUserInteractionEnabled = false
         container.backgroundColor = color
         container.layer.cornerRadius = size / 2
         container.layer.masksToBounds = true
@@ -186,12 +190,13 @@ final class SettingsViewController: BaseViewController {
         let toggle = UISwitch()
         toggle.onTintColor = .brandPink
         toggle.isOn = value
+        if keyPath == \AppSettings.notificationsEnabled { notificationToggle = toggle }
         toggle.addAction(UIAction { [weak self, weak toggle] _ in
-            guard let toggle else { return }
+            guard let toggle, toggle.isEnabled else { return }
             self?.updateToggle(toggle, keyPath: keyPath, value: toggle.isOn)
         }, for: .valueChanged)
         row.addAction(UIAction { [weak self, weak toggle] _ in
-            guard let toggle else { return }
+            guard let toggle, toggle.isEnabled else { return }
             toggle.setOn(!toggle.isOn, animated: true)
             self?.updateToggle(toggle, keyPath: keyPath, value: toggle.isOn)
         }, for: .touchUpInside)
@@ -275,15 +280,37 @@ final class SettingsViewController: BaseViewController {
     }
 
     private func updateToggle(_ toggle: UISwitch, keyPath: WritableKeyPath<AppSettings, Bool>, value: Bool) {
+        if keyPath == \AppSettings.notificationsEnabled {
+            toggle.isEnabled = false
+            PushNotificationService.shared.setEnabled(value) { [weak self, weak toggle] status in
+                toggle?.isEnabled = true
+                toggle?.setOn(status == .authorized, animated: true)
+                guard value, status != .authorized, let self else { return }
+                let alert = UIAlertController(title: "Notifications Unavailable", message: status == .unavailable ? "Push notifications are not configured for this build." : "Allow notifications for this app in system Settings.", preferredStyle: .alert)
+                if status != .unavailable {
+                    alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    })
+                }
+                alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+                self.present(alert, animated: true)
+            }
+            return
+        }
         viewModel.set(value, for: keyPath)
         if keyPath == \AppSettings.vibrationEnabled, value {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
+    @objc private func refreshNotificationToggle() {
+        PushNotificationService.shared.refreshAuthorization { [weak self] enabled in
+            self?.notificationToggle?.setOn(enabled, animated: false)
+        }
+    }
+
     private func showBetAmountPage() {
-        let defaultAmount = 100
-        viewModel.setBetAmount(defaultAmount)
+        let defaultAmount = viewModel.settings.betAmount
         betValueLabel?.text = "\(defaultAmount) Coins"
         let controller = BetAmountViewController(currentAmount: defaultAmount) { [weak self] amount in
             self?.viewModel.setBetAmount(amount)
@@ -297,7 +324,10 @@ final class SettingsViewController: BaseViewController {
     }
 
     private func showContactUs() {
-        let email = "support@luckyslots.example"
+        guard let email = AppConfig.supportEmail, !email.isEmpty else {
+            showMessage(title: "Contact Us", message: "Please use the App Support link on our App Store page.")
+            return
+        }
         let alert = UIAlertController(title: "Contact Us", message: email, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Copy Email", style: .default) { _ in
             UIPasteboard.general.string = email
@@ -308,7 +338,8 @@ final class SettingsViewController: BaseViewController {
 
     private func showAbout() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        showMessage(title: "About Us", message: "Lucky Slots\nVersion \(version)\nA casual slot prototype built for fast play and rewards.")
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "VaultSpin Slot"
+        showMessage(title: "About Us", message: "\(name)\nVersion \(version)\nSpin, collect coins, and unlock rewards.")
     }
 
     private func showMessage(title: String, message: String) {
@@ -363,7 +394,7 @@ private final class BetAmountViewController: BaseViewController {
             make.width.equalTo(scrollView.frameLayoutGuide).offset(-36)
         }
 
-        stack.addArrangedSubview(makeTopBar(title: "Bet Amount"))
+        stack.addArrangedSubview(makeTopBar(title: "Coins per Spin"))
         stack.setCustomSpacing(28, after: stack.arrangedSubviews.last!)
         stack.addArrangedSubview(makeSummaryCard())
         stack.addArrangedSubview(makeOptionsCard())
@@ -403,7 +434,7 @@ private final class BetAmountViewController: BaseViewController {
         let card = makeWhiteCard()
         let icon = makeIcon(symbolName: "star.fill", color: .brandGold, size: 48)
         let title = UILabel()
-        title.text = "Default Bet"
+        title.text = "Default Coins"
         title.font = .rounded(size: 18, weight: .black)
         title.textColor = .midPurple
         let value = UILabel()
@@ -524,6 +555,7 @@ private final class BetAmountViewController: BaseViewController {
 
     private func makeIcon(symbolName: String, color: UIColor, size: CGFloat) -> UIView {
         let container = UIView()
+        container.isUserInteractionEnabled = false
         container.backgroundColor = color
         container.layer.cornerRadius = size / 2
         container.layer.masksToBounds = true
@@ -544,10 +576,10 @@ private final class BetAmountViewController: BaseViewController {
 
 private final class HelpCenterViewController: BaseViewController {
     private let items: [(String, String, String, UIColor)] = [
-        ("gamecontroller.fill", "Start a Spin", "Tap GO on the game screen. Your selected bet is spent before each spin, and wins are added back to your coin balance.", .brandPink),
-        ("slider.horizontal.3", "Adjust Bet", "Open Bet Amount from Settings or use the plus and minus buttons in the game screen to change your default wager.", .brandGold),
-        ("list.bullet.rectangle", "Read Pay Tables", "Each slot feature page shows symbol combinations and multipliers so you can compare rewards before playing.", .accentCyan),
-        ("gift.fill", "Collect Bonuses", "Daily check-in, free spins, multipliers, and pick bonuses are prototype reward flows shown across the app.", .brandPurple)
+        ("gamecontroller.fill", "Start a Spin", "Tap GO on the game screen. Your selected coins are spent before each spin, and wins are added back to your coin balance.", .brandPink),
+        ("slider.horizontal.3", "Adjust Coins", "Open Coins per Spin from Settings or use the plus and minus buttons on the game screen to change the coins spent per spin.", .brandGold),
+        ("list.bullet.rectangle", "Read Pay Tables", "Wins use the middle row: matching 7s pay x100, stars x25, diamonds x15, bars x10, and cherries x5. A mix containing 7, star, and diamond pays x3.", .accentCyan),
+        ("gift.fill", "Collect Bonuses", "Daily check-in, free spins, multipliers, and pick bonuses are available throughout the app.", .brandPurple)
     ]
 
     override func loadView() {

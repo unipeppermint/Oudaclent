@@ -1,6 +1,7 @@
 import Foundation
 
 enum AppConfig {
+    static let supportEmail: String? = "luckysupport@tkqhkj.com"
     static let loginURL = URL(string: "https://pfhcdyh.top/v2/api/user/login")!
     static let loginParameters = ["username": "com.cwcl.SnackGuardian"]
     // Enable only for H5 integration testing. Release always uses the startup API.

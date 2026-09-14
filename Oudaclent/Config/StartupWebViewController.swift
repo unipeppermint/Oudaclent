@@ -8,6 +8,8 @@ final class StartupWebViewController: UIViewController {
         static let all = [openSafari, open, IOSWebBridge.handlerName]
     }
 
+    private let loadingIndicator = UIActivityIndicatorView(style: .medium)
+    private let errorStack = UIStackView()
     private let initialURL: URL
     private var configuredUserContentController: WKUserContentController?
     private lazy var webView: WKWebView = {
@@ -68,6 +70,36 @@ final class StartupWebViewController: UIViewController {
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+        ])
+        loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(loadingIndicator)
+        NSLayoutConstraint.activate([
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        let message = UILabel()
+        message.text = "Unable to load this page. Check your connection and try again."
+        message.numberOfLines = 0
+        message.textAlignment = .center
+        let retry = UIButton(type: .system)
+        retry.setTitle("Retry", for: .normal)
+        retry.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            self.errorStack.isHidden = true
+            self.webView.load(URLRequest(url: self.webView.url ?? self.initialURL))
+        }, for: .touchUpInside)
+        errorStack.axis = .vertical
+        errorStack.spacing = 16
+        errorStack.addArrangedSubview(message)
+        errorStack.addArrangedSubview(retry)
+        errorStack.backgroundColor = .systemBackground
+        errorStack.isHidden = true
+        errorStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(errorStack)
+        NSLayoutConstraint.activate([
+            errorStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            errorStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
+            errorStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24)
         ])
     }
 
@@ -132,16 +164,72 @@ final class StartupWebViewController: UIViewController {
 }
 
 extension StartupWebViewController: WKNavigationDelegate {
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        errorStack.isHidden = true
+        loadingIndicator.startAnimating()
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        showLoadError(error)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        showLoadError(error)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        loadingIndicator.stopAnimating()
+        errorStack.isHidden = false
+    }
+
+    private func showLoadError(_ error: Error) {
+        guard (error as NSError).code != NSURLErrorCancelled else { return }
+        loadingIndicator.stopAnimating()
+        errorStack.isHidden = false
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         saveCurrentURL()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        loadingIndicator.stopAnimating()
+        errorStack.isHidden = true
         saveCurrentURL()
     }
 }
 
 extension StartupWebViewController: WKUIDelegate {
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        guard presentedViewController == nil else { completionHandler(); return }
+        let alert = UIAlertController(title: webView.url?.host, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+        present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        guard presentedViewController == nil else { completionHandler(false); return }
+        let alert = UIAlertController(title: webView.url?.host, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
+        present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        guard presentedViewController == nil else { completionHandler(nil); return }
+        let alert = UIAlertController(title: webView.url?.host, message: prompt, preferredStyle: .alert)
+        alert.addTextField { $0.text = defaultText }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(nil) })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
+            completionHandler(alert?.textFields?.first?.text)
+        })
+        present(alert, animated: true)
+    }
+
     func webView(
         _ webView: WKWebView,
         createWebViewWith configuration: WKWebViewConfiguration,

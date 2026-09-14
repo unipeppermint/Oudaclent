@@ -2,6 +2,7 @@ import UIKit
 
 final class BonusViewController: BaseViewController {
     private let viewModel: BonusViewModel
+    private let onOpenStore: (RewardCurrency) -> Void
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
     private let chestStack = UIStackView()
@@ -12,8 +13,9 @@ final class BonusViewController: BaseViewController {
     private weak var doubleBadge: PaddingLabel?
     private let rerollButton = PrimaryButton(title: "REROLL READY", gradient: PrototypeGradient.cyan())
 
-    init(game: SlotGame) {
-        self.viewModel = BonusViewModel(game: game)
+    init(viewModel: BonusViewModel, onOpenStore: @escaping (RewardCurrency) -> Void) {
+        self.viewModel = viewModel
+        self.onOpenStore = onOpenStore
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -48,12 +50,13 @@ final class BonusViewController: BaseViewController {
 
         contentStack.addArrangedSubview(makeTopBar())
         contentStack.setCustomSpacing(28, after: contentStack.arrangedSubviews.last!)
-        contentStack.addArrangedSubview(makeHero())
-        contentStack.addArrangedSubview(makeFeatureRow())
         if viewModel.isTreasureBonus {
             contentStack.addArrangedSubview(makeTreasureBonus())
+        } else {
+            contentStack.addArrangedSubview(makeHero())
+            contentStack.addArrangedSubview(makeFeatureRow())
+            contentStack.addArrangedSubview(makePayTable())
         }
-        contentStack.addArrangedSubview(makePayTable())
         contentStack.addArrangedSubview(makeCTA())
         updateTreasureBonusUI()
     }
@@ -70,13 +73,14 @@ final class BonusViewController: BaseViewController {
             }
         }, for: .touchUpInside)
         let title = UILabel()
-        title.text = "\(viewModel.game.title) Features"
+        title.text = viewModel.isTreasureBonus ? "Treasure Bonus" : "\(viewModel.game.title) Features"
         title.font = .rounded(size: 24, weight: .black)
         title.textColor = .midPurple
         title.textAlignment = .center
         title.adjustsFontSizeToFitWidth = true
         title.minimumScaleFactor = 0.72
-        let heart = CircleButton(text: "♥", size: 40, background: .white, tint: .warning)
+        let heart = UIView()
+        heart.snp.makeConstraints { $0.width.height.equalTo(40) }
 
         bar.addSubview(back)
         bar.addSubview(title)
@@ -383,18 +387,18 @@ final class BonusViewController: BaseViewController {
         }
         rerollButton.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-16)
-            make.centerY.equalTo(doubleBadge)
-            make.width.equalTo(132)
-            make.height.equalTo(34)
+            make.top.equalTo(doubleBadge.snp.bottom).offset(8)
+            make.leading.equalTo(title)
+            make.height.equalTo(44)
         }
         status.snp.makeConstraints { make in
             make.leading.equalTo(title)
             make.trailing.equalToSuperview().offset(-16)
-            make.top.equalTo(doubleBadge.snp.bottom).offset(7)
+            make.top.equalTo(rerollButton.snp.bottom).offset(8)
             make.bottom.equalToSuperview().offset(-14)
         }
         card.snp.makeConstraints { make in
-            make.height.equalTo(224)
+            make.height.greaterThanOrEqualTo(278)
         }
         return card
     }
@@ -468,14 +472,16 @@ final class BonusViewController: BaseViewController {
                 button.alpha = index == selectedChest ? 1 : 0.5
             }
         }
-        rerollButton.title = viewModel.canReroll ? "REROLL READY" : "GET REROLL"
-        rerollButton.setEnabled(viewModel.selectedChest == nil)
+        rerollButton.title = viewModel.selectedChest != nil
+            ? (viewModel.canStartNextPick ? "USE PICK TICKET" : "GET PICK TICKET")
+            : (viewModel.canReroll ? "REROLL READY" : "GET REROLL")
+        rerollButton.setEnabled(true)
     }
 
     private func claimChest(index: Int) {
         guard let result = viewModel.claimChest(at: index) else { return }
         updateTreasureBonusUI()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        GameFeedback.reward()
         let multiplierText = result.wasDoubled ? " 2x boost applied." : ""
         showMessage(
             title: "Treasure Found",
@@ -484,18 +490,22 @@ final class BonusViewController: BaseViewController {
     }
 
     private func rerollChests() {
-        guard viewModel.reroll() else {
+        if viewModel.selectedChest != nil, viewModel.startNextPick() {
+            updateTreasureBonusUI()
+            return
+        }
+        guard viewModel.selectedChest == nil, viewModel.reroll() else {
+            let needsPick = viewModel.selectedChest != nil
             let alert = UIAlertController(
-                title: "Reroll Unavailable",
-                message: "Redeem Treasure Reroll in the Gems Store first.",
+                title: needsPick ? "Pick Ticket Required" : "Reroll Unavailable",
+                message: needsPick ? "Redeem a Bonus Pick Ticket in the Points Store to open another chest." : "Redeem Treasure Reroll in the Gems Store first.",
                 preferredStyle: .alert
             )
             alert.addAction(UIAlertAction(title: "CANCEL", style: .cancel))
             alert.addAction(UIAlertAction(title: "OPEN STORE", style: .default) { [weak self] _ in
                 guard let self else { return }
-                self.dismiss(animated: true) {
-                    (self.tabBarController as? MainTabBarController)?.showRewards()
-                }
+                let openStore = self.onOpenStore
+                self.dismiss(animated: true) { openStore(needsPick ? .points : .gems) }
             })
             present(alert, animated: true)
             return
@@ -566,7 +576,10 @@ final class BonusViewController: BaseViewController {
         let button = UIControl()
         let buttonBackground = GradientView(gradient: PrototypeGradient.goldPink(), cornerRadius: 25)
         let buttonTitle = UILabel()
-        buttonTitle.text = "PLAY NOW  →"
+        buttonTitle.text = "BACK TO GAME  →"
+        button.accessibilityIdentifier = "bonus.backToGame"
+        button.accessibilityLabel = "Back to game"
+        buttonBackground.isUserInteractionEnabled = false
         buttonTitle.font = .rounded(size: 17, weight: .black)
         buttonTitle.textColor = .white
         buttonTitle.textAlignment = .center
@@ -574,7 +587,7 @@ final class BonusViewController: BaseViewController {
         buttonTitle.minimumScaleFactor = 0.75
 
         let caption = UILabel()
-        caption.text = "Min Bet \(viewModel.game.minBet)  •  \(viewModel.game.reels) Reels  •  \(viewModel.game.paylines) Lines"
+        caption.text = "Continue playing \(viewModel.game.title)"
         caption.font = .caption
         caption.textColor = .textSecondary
         caption.textAlignment = .center
@@ -606,15 +619,7 @@ final class BonusViewController: BaseViewController {
         }
         button.addAction(UIAction { [weak self] _ in
             guard let self else { return }
-            let showGame: () -> Void = { [weak self] in
-                guard let self else { return }
-                (self.tabBarController as? MainTabBarController)?.showGame(self.viewModel.game)
-            }
-            if self.presentingViewController != nil {
-                self.dismiss(animated: true, completion: showGame)
-            } else {
-                showGame()
-            }
+            self.dismiss(animated: true)
         }, for: .touchUpInside)
         return container
     }

@@ -242,7 +242,7 @@ final class BetControl: UIView {
         betLabel.minimumScaleFactor = 0.72
 
         let title = UILabel()
-        title.text = "BET"
+        title.text = "COINS"
         title.font = .rounded(size: 15, weight: .black)
         title.textColor = .white
 

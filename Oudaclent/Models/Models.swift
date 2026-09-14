@@ -280,6 +280,7 @@ final class AppRewardsStore {
             var ids = ownedRewardIDs
             ids.insert(item.id)
             ownedRewardIDs = ids
+            defaults.set(item.id, forKey: "selectedProfileFrame")
         } else {
             var ids = activeRewardIDs
             ids.insert(item.id)
@@ -287,6 +288,18 @@ final class AppRewardsStore {
         }
         NotificationCenter.default.post(name: .didUpdateRewards, object: nil)
         return true
+    }
+
+    var profileFrame: RewardItem? {
+        let selectedID = defaults.string(forKey: "selectedProfileFrame")
+        return MockData.rewardsCatalog.first { $0.kind == .cosmetic && $0.id == selectedID && ownedRewardIDs.contains($0.id) }
+            ?? MockData.rewardsCatalog.last { $0.kind == .cosmetic && ownedRewardIDs.contains($0.id) }
+    }
+
+    func equipFrame(_ item: RewardItem) {
+        guard item.kind == .cosmetic, ownedRewardIDs.contains(item.id) else { return }
+        defaults.set(item.id, forKey: "selectedProfileFrame")
+        NotificationCenter.default.post(name: .didUpdateRewards, object: nil)
     }
 
     func hasActiveReward(_ id: String) -> Bool {
@@ -337,14 +350,14 @@ final class AppEngagementStore {
     private let calendar = Calendar.current
 
     var streak: Int {
-        defaults.object(forKey: Key.checkInStreak) as? Int ?? MockData.user.checkInStreak
+        defaults.object(forKey: Key.checkInStreak) as? Int ?? 0
     }
 
     var canCheckIn: Bool {
         guard let lastDate = defaults.object(forKey: Key.lastCheckInDate) as? Date else {
             return true
         }
-        return calendar.startOfDay(for: lastDate) != today
+        return calendar.startOfDay(for: lastDate) < today
     }
 
     var nextCheckInReward: (coins: Int, gems: Int, streak: Int) {
@@ -362,10 +375,10 @@ final class AppEngagementStore {
         let coins = coinsForCheckInDay(day)
         let gems = gemsForCheckInDay(day)
 
-        AppCurrencyStore.shared.add(coins, to: .coins)
-        AppCurrencyStore.shared.add(gems, to: .gems)
         defaults.set(today, forKey: Key.lastCheckInDate)
         defaults.set(nextStreak, forKey: Key.checkInStreak)
+        AppCurrencyStore.shared.add(coins, to: .coins)
+        AppCurrencyStore.shared.add(gems, to: .gems)
         NotificationCenter.default.post(name: .didUpdateEngagement, object: nil)
         return CheckInResult(streak: nextStreak, coins: coins, gems: gems)
     }
@@ -413,14 +426,12 @@ final class AppAchievementStore {
     }
 
     var achievements: [Achievement] {
-        let streak = currentWinStreak
+        let claimed = Set(defaults.stringArray(forKey: Key.claimed) ?? [])
         return MockData.achievements.map { achievement in
-            guard achievement.title == "10 Win Streak" || achievement.title == "100 Win Streak" else {
-                return achievement
-            }
             var updated = achievement
-            updated.currentProgress = min(streak, achievement.totalProgress)
-            updated.unlocked = updated.currentProgress >= updated.totalProgress
+            updated.unlocked = claimed.contains(achievement.title)
+            updated.currentProgress = updated.unlocked ? achievement.totalProgress
+                : (achievement.title == "First Jackpot" ? 0 : min(currentWinStreak, achievement.totalProgress))
             return updated
         }
     }
@@ -432,7 +443,9 @@ final class AppAchievementStore {
 
         var gemsEarned = 0
         if hitJackpot {
-            gemsEarned += claim(MockData.achievements[0])
+            var jackpot = MockData.achievements[0]
+            jackpot.unlocked = true
+            gemsEarned += claim(jackpot)
         }
         for achievement in MockData.achievements where achievement.title != "First Jackpot" {
             guard nextStreak >= achievement.totalProgress else { continue }
@@ -441,6 +454,7 @@ final class AppAchievementStore {
             unlockedAchievement.currentProgress = achievement.totalProgress
             gemsEarned += claim(unlockedAchievement)
         }
+        NotificationCenter.default.post(name: .didUpdateAchievements, object: nil)
         return gemsEarned
     }
 
@@ -566,7 +580,7 @@ enum MockData {
             jackpotPool: 2_000_000,
             features: [
                 GameFeature(iconName: "map.fill", title: "Pick Bonus", description: "Choose a chest and reveal a prize"),
-                GameFeature(iconName: "shield.lefthalf.filled", title: "Safe Bet", description: "Protection on selected max bets")
+                GameFeature(iconName: "shield.lefthalf.filled", title: "Coin Shield", description: "Coin protection on selected maximum-cost spins")
             ],
             symbolSet: [.seven, .star, .diamond, .bar]
         )
@@ -601,8 +615,8 @@ enum MockData {
         ),
         RewardItem(
             id: "safeBetShield",
-            title: "Safe Bet Shield",
-            description: "Refund 50% of the bet if your next spin loses.",
+            title: "Coin Shield",
+            description: "Return 50% of the coins spent if your next spin has no win.",
             iconName: "shield.lefthalf.filled",
             cost: 800,
             currency: .points,

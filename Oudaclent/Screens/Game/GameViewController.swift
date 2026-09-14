@@ -2,6 +2,7 @@ import UIKit
 
 final class GameViewController: BaseViewController {
     private let viewModel: GameViewModel
+    private lazy var bonusViewModel = BonusViewModel(game: viewModel.game)
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
     private let balanceBadge = PrototypeCoinBadge(
@@ -14,6 +15,7 @@ final class GameViewController: BaseViewController {
     private let spinButton = SpinButton()
     private let betControl = BetControl()
     private let winLabel = UILabel()
+    private let jackpotLabel = UILabel()
     private let rewardBanner = ActiveRewardBannerView()
     private let pointsEarnedLabel = UILabel()
 
@@ -49,6 +51,9 @@ final class GameViewController: BaseViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshWallet()
+        if !spinButton.isSpinning {
+            betControl.bet = max(viewModel.game.minBet, AppSettingsStore.shared.settings.betAmount)
+        }
         updateRewardBanner()
     }
 
@@ -88,7 +93,7 @@ final class GameViewController: BaseViewController {
         title.adjustsFontSizeToFitWidth = true
         title.minimumScaleFactor = 0.78
 
-        let jackpot = UILabel()
+        let jackpot = jackpotLabel
         jackpot.text = "JP  \(Formatters.integer.string(from: NSNumber(value: viewModel.game.jackpotPool)) ?? "\(viewModel.game.jackpotPool)")"
         jackpot.font = .rounded(size: 15, weight: .black)
         jackpot.textColor = .brandGold
@@ -96,7 +101,7 @@ final class GameViewController: BaseViewController {
         jackpot.adjustsFontSizeToFitWidth = true
         jackpot.minimumScaleFactor = 0.78
 
-        winLabel.text = "BIG WIN! +1,500"
+        winLabel.text = "READY TO SPIN"
         winLabel.font = .rounded(size: 26, weight: .black)
         winLabel.textColor = .brandGold
         winLabel.textAlignment = .center
@@ -153,10 +158,6 @@ final class GameViewController: BaseViewController {
             make.height.equalTo(44)
         }
         contentStack.setCustomSpacing(14, after: rewardBanner)
-        if viewModel.game.id == "treasureHunter" {
-            contentStack.addArrangedSubview(makeBonusLink())
-            contentStack.setCustomSpacing(14, after: contentStack.arrangedSubviews.last!)
-        }
         contentStack.addArrangedSubview(machine)
         machine.snp.makeConstraints { make in
             make.height.equalTo(machine.snp.width).multipliedBy(0.78)
@@ -179,6 +180,9 @@ final class GameViewController: BaseViewController {
         }
         contentStack.setCustomSpacing(22, after: betControl)
         contentStack.addArrangedSubview(spinHolder)
+        if viewModel.game.id == "treasureHunter" {
+            contentStack.addArrangedSubview(makeBonusLink())
+        }
 
         betControl.minimumBet = viewModel.game.minBet
         betControl.bet = viewModel.bet
@@ -190,13 +194,24 @@ final class GameViewController: BaseViewController {
     }
 
     private func spin() {
-        guard let outcome = viewModel.spin() else { return }
+        guard !spinButton.isSpinning else { return }
+        guard let outcome = viewModel.spin() else {
+            let alert = UIAlertController(title: "Not Enough Coins", message: "Lower Coins per Spin, collect your daily check-in, or redeem a Free Spin Ticket in Rewards.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Rewards", style: .default) { [weak self] _ in
+                (self?.tabBarController as? MainTabBarController)?.showRewards()
+            })
+            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+            present(alert, animated: true)
+            return
+        }
         spinButton.isSpinning = true
+        betControl.isUserInteractionEnabled = false
         balanceBadge.configure(amount: viewModel.coins)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        GameFeedback.spin()
         machine.spinAll(outcome.result) { [weak self] in
             guard let self else { return }
             self.spinButton.isSpinning = false
+            self.betControl.isUserInteractionEnabled = true
             self.balanceBadge.configure(amount: self.viewModel.coins)
             self.showWin(outcome)
             self.updateRewardBanner()
@@ -205,15 +220,15 @@ final class GameViewController: BaseViewController {
 
     private func showWin(_ outcome: SpinOutcome) {
         let win = outcome.win
-        let visibleWin = win > 0 ? win : 1_500
-        winLabel.text = "BIG WIN! +\(Formatters.integer.string(from: NSNumber(value: visibleWin)) ?? "\(visibleWin)")"
+        winLabel.text = win > 0 ? "WIN! +\(Formatters.integer.string(from: NSNumber(value: win)) ?? "\(win)")" : "NO WIN THIS SPIN"
+        jackpotLabel.text = "JP  \(Formatters.integer.string(from: NSNumber(value: outcome.jackpot)) ?? "\(outcome.jackpot)")"
         var earnedText = "+\(Formatters.integer.string(from: NSNumber(value: outcome.pointsEarned)) ?? "\(outcome.pointsEarned)") POINTS"
         if outcome.gemsEarned > 0 {
             earnedText += " · +\(outcome.gemsEarned) GEMS"
         }
         pointsEarnedLabel.text = outcome.rewardMessage.map { "\(earnedText) · \($0)" } ?? earnedText
         if win >= viewModel.bet * 10 {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            GameFeedback.reward()
             BigWinOverlayView().show(amount: win, in: view)
         }
     }
@@ -280,7 +295,11 @@ final class GameViewController: BaseViewController {
         }
         link.addAction(UIAction { [weak self] _ in
             guard let self else { return }
-            self.present(BonusViewController(game: self.viewModel.game), animated: true)
+            let tabs = self.tabBarController as? MainTabBarController
+            let bonus = BonusViewController(viewModel: self.bonusViewModel, onOpenStore: { [weak tabs] currency in
+                tabs?.showRewards(currency: currency)
+            })
+            self.present(bonus, animated: true)
         }, for: .touchUpInside)
         return link
     }

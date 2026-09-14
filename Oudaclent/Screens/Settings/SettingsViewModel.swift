@@ -21,7 +21,7 @@ final class SettingsViewModel {
             .toggle(icon: "speaker.wave.2.fill", title: "Sound", keyPath: \.soundEnabled),
             .toggle(icon: "iphone.radiowaves.left.and.right", title: "Vibration", keyPath: \.vibrationEnabled),
             .toggle(icon: "bell.fill", title: "Notifications", keyPath: \.notificationsEnabled),
-            .value(icon: "star.fill", title: "Bet Amount", value: Formatters.coins(settings.betAmount)),
+            .value(icon: "star.fill", title: "Coins per Spin", value: Formatters.coins(settings.betAmount)),
             .header("SUPPORT"),
             .action(icon: "questionmark.circle.fill", title: "Help Center", destructive: false),
             .action(icon: "envelope.fill", title: "Contact Us", destructive: false),

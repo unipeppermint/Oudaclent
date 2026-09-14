@@ -69,7 +69,11 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         selectTab(1)
     }
 
-    func showRewards() {
+    func showRewards(currency: RewardCurrency? = nil) {
+        if let currency, let navigation = viewControllers?[2] as? UINavigationController,
+           let rewards = navigation.viewControllers.first as? RewardsViewController {
+            rewards.selectCurrency(currency)
+        }
         selectTab(2)
     }
 

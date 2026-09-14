@@ -9,6 +9,8 @@ struct TreasureBonusResult {
 final class BonusViewModel {
     let game: SlotGame
     let payTable = MockData.payTable
+    private let defaults: UserDefaults
+    private var storageKey: String { "treasureBonus." + game.id }
     private let wallet = AppCurrencyStore.shared
     private let rewardsStore = AppRewardsStore.shared
     private(set) var chestRewards: [Int] = []
@@ -16,9 +18,36 @@ final class BonusViewModel {
     private(set) var claimedReward: Int?
     private(set) var claimedWithDouble = false
 
-    init(game: SlotGame) {
+    init(game: SlotGame, defaults: UserDefaults = .standard) {
         self.game = game
+        self.defaults = defaults
+        if let state = defaults.dictionary(forKey: storageKey),
+           let rewards = state["rewards"] as? [Int], rewards.count == 3 {
+            chestRewards = rewards
+            selectedChest = state["selected"] as? Int
+            claimedReward = state["claimed"] as? Int
+            claimedWithDouble = state["doubled"] as? Bool ?? false
+        } else {
+            resetChests()
+        }
+    }
+
+    var canStartNextPick: Bool {
+        selectedChest != nil && rewardsStore.hasActiveReward("bonusPickTicket")
+    }
+
+    func startNextPick() -> Bool {
+        guard canStartNextPick else { return false }
+        rewardsStore.consumeActiveReward("bonusPickTicket")
         resetChests()
+        return true
+    }
+
+    private func save() {
+        var state: [String: Any] = ["rewards": chestRewards, "doubled": claimedWithDouble]
+        state["selected"] = selectedChest
+        state["claimed"] = claimedReward
+        defaults.set(state, forKey: storageKey)
     }
 
     var isTreasureBonus: Bool {
@@ -30,7 +59,9 @@ final class BonusViewModel {
     }
 
     var canReroll: Bool {
-        isTreasureBonus && selectedChest == nil && rewardsStore.hasActiveReward("treasureReroll")
+        isTreasureBonus && selectedChest == nil
+            && defaults.dictionary(forKey: storageKey)?["selected"] == nil
+            && rewardsStore.hasActiveReward("treasureReroll")
     }
 
     var hasDoubleTreasure: Bool {
@@ -46,7 +77,9 @@ final class BonusViewModel {
     }
 
     func claimChest(at index: Int) -> TreasureBonusResult? {
-        guard isTreasureBonus, selectedChest == nil, chestRewards.indices.contains(index) else {
+        guard isTreasureBonus, selectedChest == nil,
+              defaults.dictionary(forKey: storageKey)?["selected"] == nil,
+              chestRewards.indices.contains(index) else {
             return nil
         }
 
@@ -56,6 +89,7 @@ final class BonusViewModel {
         let reward = wasDoubled ? baseReward * 2 : baseReward
         claimedReward = reward
         claimedWithDouble = wasDoubled
+        save()
         wallet.add(reward, to: .coins)
         if wasDoubled {
             rewardsStore.consumeActiveReward("doubleTreasure")
@@ -68,5 +102,6 @@ final class BonusViewModel {
         selectedChest = nil
         claimedReward = nil
         claimedWithDouble = false
+        save()
     }
 }

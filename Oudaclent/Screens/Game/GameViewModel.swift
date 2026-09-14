@@ -74,14 +74,14 @@ final class GameViewModel {
             messages.append("Premium Free Spin used")
         }
         let usesSafeBet = rewardsStore.hasActiveReward("safeBetShield")
-        if usesSafeBet {
+        if usesSafeBet && !usesFreeSpin && !usesPremiumFreeSpin {
             if win == 0 {
                 let refund = bet / 2
                 wallet.add(refund, to: .coins)
                 coins = wallet.coins
-                messages.append("Safe Bet refunded \(Formatters.coins(refund))")
+                messages.append("Coin Shield returned \(Formatters.coins(refund))")
             } else {
-                messages.append("Safe Bet protected this spin")
+                messages.append("Coin Shield protected this spin")
             }
             rewardsStore.consumeActiveReward("safeBetShield")
         }

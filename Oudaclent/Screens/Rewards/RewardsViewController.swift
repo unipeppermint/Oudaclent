@@ -40,6 +40,13 @@ final class RewardsViewController: BaseViewController {
         refreshRewards()
     }
 
+    func selectCurrency(_ currency: RewardCurrency) {
+        loadViewIfNeeded()
+        selectedCurrency = currency
+        currencySegment.selectedSegmentIndex = currency == .points ? 0 : 1
+        refreshRewards()
+    }
+
     private func setup() {
         scrollView.showsVerticalScrollIndicator = false
         addSubview(scrollView) { make in
@@ -308,6 +315,7 @@ final class RewardsViewController: BaseViewController {
         }, for: .touchUpInside)
 
         let iconCircle = UIView()
+        iconCircle.isUserInteractionEnabled = false
         iconCircle.backgroundColor = item.accentColor
         iconCircle.layer.cornerRadius = 24
         iconCircle.layer.masksToBounds = true
@@ -411,6 +419,11 @@ final class RewardsViewController: BaseViewController {
 
     private func redeem(_ item: RewardItem) {
         if store.isRedeemed(item) {
+            if item.kind == .cosmetic {
+                store.equipFrame(item)
+                showMessage(title: "Frame Equipped", message: "\(item.title) is now visible on your profile.")
+                return
+            }
             showMessage(title: item.kind == .cosmetic ? "Already Owned" : "Already Active", message: "\(item.title) is ready to use.")
             return
         }
@@ -421,7 +434,7 @@ final class RewardsViewController: BaseViewController {
                 : "Play more spins and complete achievements to earn more points.")
             return
         }
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        GameFeedback.reward()
         let currencyName = item.currency == .gems ? "Gems" : "Points"
         showMessage(title: "Redeemed", message: "\(item.title) cost \(item.cost) \(currencyName) and is ready to use.")
     }
