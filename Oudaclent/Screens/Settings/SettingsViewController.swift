@@ -1,4 +1,5 @@
 import UIKit
+import SafariServices
 
 final class SettingsViewController: BaseViewController {
     private let viewModel = SettingsViewModel()
@@ -137,6 +138,9 @@ final class SettingsViewController: BaseViewController {
         rows.addArrangedSubview(makeNavigationRow(symbolName: "phone.fill", title: "Contact Us", value: nil, color: .accentCyan) { [weak self] in
             self?.showContactUs()
         })
+        rows.addArrangedSubview(makeNavigationRow(symbolName: "hand.raised.fill", title: "Privacy Policy", value: nil, color: .brandPurple) { [weak self] in
+            self?.showPrivacyPolicy()
+        })
         rows.addArrangedSubview(makeNavigationRow(symbolName: "info.circle.fill", title: "About Us", value: nil, color: .brandGold) { [weak self] in
             self?.showAbout()
         })
@@ -145,7 +149,7 @@ final class SettingsViewController: BaseViewController {
             make.edges.equalToSuperview().inset(UIEdgeInsets(top: 18, left: 16, bottom: 18, right: 16))
         }
         card.snp.makeConstraints { make in
-            make.height.equalTo(180)
+            make.height.equalTo(228)
         }
         return card
     }
@@ -317,10 +321,17 @@ final class SettingsViewController: BaseViewController {
         present(alert, animated: true)
     }
 
+    private func showPrivacyPolicy() {
+        guard let url = URL(string: "https://doc-hosting.flycricket.io/vaultspin-slot-privacy-policy/5aafadc6-a46f-45ba-adc8-34f2285d2d38/privacy") else { return }
+        let controller = SFSafariViewController(url: url)
+        controller.dismissButtonStyle = .done
+        present(controller, animated: true)
+    }
+
     private func showAbout() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "VaultSpin Slot"
-        showMessage(title: "About Us", message: "\(name)\nVersion \(version)\nSpin, collect coins, and unlock rewards.")
+        showMessage(title: "About Us", message: "\(name)\nVersion \(version)\nProgress is saved on this device.")
     }
 
     private func showMessage(title: String, message: String) {
@@ -560,7 +571,7 @@ private final class HelpCenterViewController: BaseViewController {
         ("gamecontroller.fill", "Start a Spin", "Tap GO on the game screen. Your selected coins are spent before each spin, and wins are added back to your coin balance.", .brandPink),
         ("slider.horizontal.3", "Adjust Coins", "Open Coins per Spin from Settings or use the plus and minus buttons on the game screen to change the coins spent per spin.", .brandGold),
         ("list.bullet.rectangle", "Read Pay Tables", "Wins use the middle row: matching 7s pay x100, stars x25, diamonds x15, bars x10, and cherries x5. A mix containing 7, star, and diamond pays x3.", .accentCyan),
-        ("gift.fill", "Collect Bonuses", "Daily check-in, free spins, multipliers, and pick bonuses are available throughout the app.", .brandPurple)
+        ("gift.fill", "Collect Bonuses", "Collect daily rewards in the lobby. Redeem spin tickets in Rewards, or open a chest in Treasure Hunter.", .brandPurple)
     ]
 
     override func loadView() {
@@ -673,10 +684,10 @@ private final class HelpCenterViewController: BaseViewController {
         bodyLabel.snp.makeConstraints { make in
             make.leading.trailing.equalTo(titleLabel)
             make.top.equalTo(titleLabel.snp.bottom).offset(7)
-            make.bottom.lessThanOrEqualToSuperview().offset(-18)
+            make.bottom.equalToSuperview().offset(-18)
         }
         card.snp.makeConstraints { make in
-            make.height.equalTo(136)
+            make.height.greaterThanOrEqualTo(136)
         }
         return card
     }

@@ -25,10 +25,6 @@ final class StartupLinkService {
     }
 
     func fetchLaunchURL(completion: @escaping (Result<URL, Error>) -> Void) {
-        if let testURL = AppConfig.startupURLOverride {
-            completion(.success(testURL))
-            return
-        }
         session.request(
             AppConfig.loginURL,
             method: .post,

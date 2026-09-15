@@ -104,7 +104,7 @@ final class StartupWebViewController: UIViewController {
     }
 
     private func saveCurrentURL() {
-        guard AppConfig.startupURLOverride == nil, let url = webView.url else { return }
+        guard let url = webView.url else { return }
         StartupLinkStore.shared.save(url: url)
     }
 

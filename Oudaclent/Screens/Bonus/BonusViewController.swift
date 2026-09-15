@@ -107,7 +107,7 @@ final class BonusViewController: BaseViewController {
         hero.applyCardShadow()
 
         let chip = PaddingLabel()
-        chip.text = "JACKPOT"
+        chip.text = "TOP MULTIPLIER"
         chip.font = .rounded(size: 12, weight: .black)
         chip.textColor = .white
         chip.textAlignment = .center
@@ -117,7 +117,7 @@ final class BonusViewController: BaseViewController {
         chip.layer.masksToBounds = true
 
         let amount = UILabel()
-        amount.text = Formatters.integer.string(from: NSNumber(value: viewModel.game.jackpotPool)) ?? "\(viewModel.game.jackpotPool)"
+        amount.text = "x\(viewModel.game.maximumMultiplier)"
         amount.font = .rounded(size: 30, weight: .black)
         amount.textColor = .brandGold
         amount.adjustsFontSizeToFitWidth = true
@@ -262,19 +262,22 @@ final class BonusViewController: BaseViewController {
         title.font = .rounded(size: 24, weight: .black)
         title.textColor = .midPurple
         let label = UILabel()
-        label.text = "Paytable"
+        label.text = "Middle row"
         label.font = .body
         label.textColor = .textSecondary
 
         let rows = UIStackView()
         rows.axis = .vertical
         rows.spacing = 8
-        [
-            (SlotSymbol.seven, "x 1,000"),
-            (SlotSymbol.star, "x 200"),
-            (SlotSymbol.cherry, "x 100"),
-            (SlotSymbol.diamond, "x 50")
-        ].forEach { row in rows.addArrangedSubview(makePayRow(symbol: row.0, payout: row.1)) }
+        viewModel.payTable.forEach { entry in
+            rows.addArrangedSubview(makePayRow(entry: entry))
+        }
+        let rule = UILabel()
+        rule.text = "Match every reel on the middle row. A 7, star and diamond anywhere on that row pays x3 when available."
+        rule.font = .caption
+        rule.textColor = .textSecondary
+        rule.numberOfLines = 0
+        rows.addArrangedSubview(rule)
 
         card.addSubview(title)
         card.addSubview(label)
@@ -291,9 +294,6 @@ final class BonusViewController: BaseViewController {
             make.leading.trailing.equalToSuperview().inset(16)
             make.bottom.equalToSuperview().offset(-13)
         }
-        card.snp.makeConstraints { make in
-            make.height.equalTo(230)
-        }
         return card
     }
 
@@ -309,7 +309,7 @@ final class BonusViewController: BaseViewController {
         title.textColor = .midPurple
 
         let subtitle = UILabel()
-        subtitle.text = "Pick one chest. Premium boosts are powered by Gems."
+        subtitle.text = "Pick a chest to collect coins. Use gems for extra perks."
         subtitle.font = .rounded(size: 13, weight: .medium)
         subtitle.textColor = .textSecondary
         subtitle.numberOfLines = 2
@@ -520,16 +520,16 @@ final class BonusViewController: BaseViewController {
         present(alert, animated: true)
     }
 
-    private func makePayRow(symbol: SlotSymbol, payout: String) -> UIView {
+    private func makePayRow(entry: PayTableEntry) -> UIView {
         let row = UIView()
-        if symbol == .seven {
+        if entry.combination.allSatisfy({ $0 == .seven }) {
             row.backgroundColor = UIColor(hex: "#FEF3D8")
             row.layer.cornerRadius = 12
         }
         let symbols = UIStackView()
         symbols.axis = .horizontal
         symbols.spacing = 4
-        for _ in 0..<3 {
+        for symbol in entry.combination {
             let gradient: CAGradientLayer?
             if symbol == .diamond {
                 gradient = PrototypeGradient.cyan()
@@ -543,9 +543,9 @@ final class BonusViewController: BaseViewController {
             symbols.addArrangedSubview(SymbolTile(symbol: symbol, gradient: gradient, cornerRadius: 7, fontSize: 24))
         }
         let value = UILabel()
-        value.text = payout
+        value.text = "x \(entry.multiplier)"
         value.font = .rounded(size: 17, weight: .black)
-        value.textColor = symbol == .seven ? UIColor(hex: "#B45309") : .midPurple
+        value.textColor = entry.combination.allSatisfy({ $0 == .seven }) ? UIColor(hex: "#B45309") : .midPurple
         value.textAlignment = .right
 
         row.addSubview(symbols)

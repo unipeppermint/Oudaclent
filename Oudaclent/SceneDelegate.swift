@@ -38,14 +38,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
                 switch result {
                 case .success(let url):
-                    print("[Startup] opening webview: \(url.absoluteString)")
                     self.showStartupWebView(url: url)
                 case .failure:
                     if let cachedURL = StartupLinkStore.shared.lastWebViewURL {
-                        print("[Startup] opening cached webview: \(cachedURL.absoluteString)")
                         self.showStartupWebView(url: cachedURL)
                     } else {
-                        print("[Startup] opening main app")
                         self.showMainApp()
                     }
                 }

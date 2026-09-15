@@ -94,7 +94,7 @@ final class GameViewController: BaseViewController {
         title.minimumScaleFactor = 0.78
 
         let jackpot = jackpotLabel
-        jackpot.text = "JP  \(Formatters.integer.string(from: NSNumber(value: viewModel.game.jackpotPool)) ?? "\(viewModel.game.jackpotPool)")"
+        jackpot.text = "TOP WIN  x\(viewModel.game.maximumMultiplier)"
         jackpot.font = .rounded(size: 15, weight: .black)
         jackpot.textColor = .brandGold
         jackpot.textAlignment = .center
@@ -136,7 +136,7 @@ final class GameViewController: BaseViewController {
         titleStack.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.centerY.equalToSuperview()
-            make.width.equalTo(188)
+            make.width.lessThanOrEqualTo(188)
             make.leading.greaterThanOrEqualTo(back.snp.trailing).offset(8)
             make.trailing.lessThanOrEqualTo(balanceBadge.snp.leading).offset(-2)
         }
@@ -160,7 +160,7 @@ final class GameViewController: BaseViewController {
         contentStack.setCustomSpacing(14, after: rewardBanner)
         contentStack.addArrangedSubview(machine)
         machine.snp.makeConstraints { make in
-            make.height.equalTo(machine.snp.width).multipliedBy(0.78)
+            make.height.equalTo(machine.snp.width).multipliedBy(0.78).priority(750)
             make.height.lessThanOrEqualTo(292)
             make.height.greaterThanOrEqualTo(220)
         }
@@ -221,7 +221,6 @@ final class GameViewController: BaseViewController {
     private func showWin(_ outcome: SpinOutcome) {
         let win = outcome.win
         winLabel.text = win > 0 ? "WIN! +\(Formatters.integer.string(from: NSNumber(value: win)) ?? "\(win)")" : "NO WIN THIS SPIN"
-        jackpotLabel.text = "JP  \(Formatters.integer.string(from: NSNumber(value: outcome.jackpot)) ?? "\(outcome.jackpot)")"
         var earnedText = "+\(Formatters.integer.string(from: NSNumber(value: outcome.pointsEarned)) ?? "\(outcome.pointsEarned)") POINTS"
         if outcome.gemsEarned > 0 {
             earnedText += " · +\(outcome.gemsEarned) GEMS"

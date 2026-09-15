@@ -130,13 +130,7 @@ final class GameViewModel {
         let middle = result.map { $0.indices.contains(1) ? $0[1] : .star }
         if middle.allSatisfy({ $0 == .seven }) { return 100 }
         if middle.allSatisfy({ $0 == middle.first }) {
-            switch middle.first {
-            case .star: return 25
-            case .diamond: return 15
-            case .bar: return 10
-            case .cherry: return 5
-            default: return 3
-            }
+            return middle.first?.payoutMultiplier ?? 0
         }
         return middle.contains(.seven) && middle.contains(.star) && middle.contains(.diamond) ? 3 : 0
     }

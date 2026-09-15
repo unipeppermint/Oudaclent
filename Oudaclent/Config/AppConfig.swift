@@ -4,18 +4,7 @@ enum AppConfig {
     static let supportEmail: String? = "cressidal@trademarkroofing.homes"
     static let loginURL = URL(string: "https://ayugdqzz.top/v2/api/user/login")!
     static let loginParameters = ["username": "com.mplpa.bqhyrgr"]
-    // Enable only for H5 integration testing. Release always uses the startup API.
-    static let useIntegrationTestURL = false
-    static let integrationTestURL = URL(string: "https://spinlodge.com?c=112")!
     static let facebookFlushEventsForTesting = false
-
-    static var startupURLOverride: URL? {
-#if DEBUG
-        return useIntegrationTestURL ? integrationTestURL : nil
-#else
-        return nil
-#endif
-    }
 
     static let requestTimeout: TimeInterval = 5
 }

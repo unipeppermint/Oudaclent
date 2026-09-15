@@ -27,6 +27,18 @@ struct SlotGame {
     var jackpotPool: Int
     var features: [GameFeature]
     var symbolSet: [SlotSymbol]
+
+    var maximumMultiplier: Int { symbolSet.map(\.payoutMultiplier).max() ?? 0 }
+
+    var payTable: [PayTableEntry] {
+        var rows = symbolSet.map {
+            PayTableEntry(combination: Array(repeating: $0, count: reels), multiplier: $0.payoutMultiplier)
+        }
+        if [.seven, .star, .diamond].allSatisfy({ symbolSet.contains($0) }) {
+            rows.append(PayTableEntry(combination: [.seven, .star, .diamond], multiplier: 3))
+        }
+        return rows
+    }
 }
 
 enum SlotTheme: String, Codable {
@@ -71,6 +83,16 @@ enum SlotSymbol: String, Codable, CaseIterable {
     case cherry = "🍒"
 
     var display: String { rawValue }
+
+    var payoutMultiplier: Int {
+        switch self {
+        case .seven: return 100
+        case .star: return 25
+        case .diamond: return 15
+        case .bar: return 10
+        case .cherry: return 5
+        }
+    }
 
     var color: UIColor {
         switch self {
@@ -541,31 +563,31 @@ enum MockData {
         SlotGame(
             id: "lucky7",
             title: "Lucky 7",
-            subtitle: "Classic 3 Reels · High Payout",
+            subtitle: "3 Reels · Middle Row",
             theme: .classic,
             reels: 3,
-            paylines: 5,
+            paylines: 1,
             minBet: 100,
             jackpotPool: 1_000_000,
             features: [
-                GameFeature(iconName: "crown.fill", title: "JACKPOT", description: "Three 7s wins the mega jackpot"),
-                GameFeature(iconName: "arrow.triangle.2.circlepath", title: "Free Spins", description: "Trigger 10 free spins with 3 scatters"),
-                GameFeature(iconName: "bolt.fill", title: "Multiplier", description: "Up to x10 multiplier chain")
+                GameFeature(iconName: "crown.fill", title: "JACKPOT", description: "Match three 7s on the middle row for x100."),
+                GameFeature(iconName: "arrow.triangle.2.circlepath", title: "Free Spins", description: "Redeem a ticket in Rewards for a free spin."),
+                GameFeature(iconName: "bolt.fill", title: "Pay Table", description: "See the pay table for each symbol.")
             ],
             symbolSet: [.seven, .star, .diamond, .bar, .cherry]
         ),
         SlotGame(
             id: "sweetCandy",
             title: "Sweet Candy",
-            subtitle: "5 Reels · 25 Paylines",
+            subtitle: "5 Reels · Middle Row",
             theme: .candy,
             reels: 5,
-            paylines: 25,
+            paylines: 1,
             minBet: 50,
             jackpotPool: 500_000,
             features: [
-                GameFeature(iconName: "sparkles", title: "Candy Blast", description: "Wild sweets can clear a whole reel"),
-                GameFeature(iconName: "gift.fill", title: "Daily Treat", description: "Collect a treat after every session")
+                GameFeature(iconName: "sparkles", title: "Matching Symbols", description: "Match five symbols on the middle row."),
+                GameFeature(iconName: "gift.fill", title: "Daily Check-in", description: "Collect your daily reward in the lobby.")
             ],
             symbolSet: [.star, .cherry, .diamond]
         ),
@@ -575,12 +597,12 @@ enum MockData {
             subtitle: "5 Reels · Treasure Bonus",
             theme: .treasure,
             reels: 5,
-            paylines: 20,
+            paylines: 1,
             minBet: 200,
             jackpotPool: 2_000_000,
             features: [
                 GameFeature(iconName: "map.fill", title: "Pick Bonus", description: "Choose a chest and reveal a prize"),
-                GameFeature(iconName: "shield.lefthalf.filled", title: "Coin Shield", description: "Coin protection on selected maximum-cost spins")
+                GameFeature(iconName: "shield.lefthalf.filled", title: "Coin Shield", description: "Refund half the cost of a losing paid spin.")
             ],
             symbolSet: [.seven, .star, .diamond, .bar]
         )
@@ -636,7 +658,7 @@ enum MockData {
         RewardItem(
             id: "bonusPickTicket",
             title: "Bonus Pick Ticket",
-            description: "Reserve one bonus pick for your next treasure run.",
+            description: "Open another chest after your current pick.",
             iconName: "gift.fill",
             cost: 1_000,
             currency: .points,
@@ -646,7 +668,7 @@ enum MockData {
         RewardItem(
             id: "goldCrownFrame",
             title: "Gold Crown Frame",
-            description: "Unlock a premium profile frame.",
+            description: "Add a gold frame to your profile.",
             iconName: "crown.fill",
             cost: 80,
             currency: .gems,
@@ -686,7 +708,7 @@ enum MockData {
         RewardItem(
             id: "diamondProfileFrame",
             title: "Diamond Profile Frame",
-            description: "Unlock an exclusive profile frame.",
+            description: "Add a diamond frame to your profile.",
             iconName: "diamond.fill",
             cost: 150,
             currency: .gems,

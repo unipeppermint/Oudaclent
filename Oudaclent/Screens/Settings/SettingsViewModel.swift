@@ -25,6 +25,7 @@ final class SettingsViewModel {
             .header("SUPPORT"),
             .action(icon: "questionmark.circle.fill", title: "Help Center", destructive: false),
             .action(icon: "envelope.fill", title: "Contact Us", destructive: false),
+            .action(icon: "hand.raised.fill", title: "Privacy Policy", destructive: false),
             .action(icon: "info.circle.fill", title: "About Us", destructive: false)
         ]
     }

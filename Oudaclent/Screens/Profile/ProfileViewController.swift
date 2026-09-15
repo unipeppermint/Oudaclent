@@ -133,7 +133,7 @@ final class ProfileViewController: BaseViewController {
         name.minimumScaleFactor = 0.78
 
         let tier = PaddingLabel()
-        tier.text = "LV 12 · Gold Member"
+        tier.text = "Player Profile"
         tier.font = .rounded(size: 13, weight: .black)
         tier.textColor = UIColor(hex: "#B45309")
         tier.backgroundColor = UIColor(hex: "#FEF3C7")

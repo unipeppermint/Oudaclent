@@ -8,7 +8,7 @@ struct TreasureBonusResult {
 
 final class BonusViewModel {
     let game: SlotGame
-    let payTable = MockData.payTable
+    var payTable: [PayTableEntry] { game.payTable }
     private let defaults: UserDefaults
     private var storageKey: String { "treasureBonus." + game.id }
     private let wallet = AppCurrencyStore.shared

@@ -66,14 +66,14 @@ final class LobbyViewController: BaseViewController {
         face.textColor = .brandGold
 
         let title = UILabel()
-        title.text = "Hi, Lucky!"
+        title.text = "VaultSpin Slot"
         title.font = .rounded(size: 24, weight: .black)
         title.textColor = .midPurple
         title.adjustsFontSizeToFitWidth = true
         title.minimumScaleFactor = 0.82
 
         let subtitle = UILabel()
-        subtitle.text = "What do you play today?"
+        subtitle.text = "Choose a game."
         subtitle.font = .rounded(size: 16, weight: .medium)
         subtitle.textColor = .textSecondary
         subtitle.adjustsFontSizeToFitWidth = true
@@ -158,7 +158,7 @@ final class LobbyViewController: BaseViewController {
     private func makeHotHeader() -> UIView {
         let view = UIView()
         let title = UILabel()
-        title.text = "Hot Slots"
+        title.text = "Games"
         title.font = .rounded(size: 26, weight: .black)
         title.textColor = .midPurple
         let all = UIButton(type: .system)
@@ -193,8 +193,8 @@ final class LobbyViewController: BaseViewController {
 
     private func tag(for index: Int) -> (text: String, color: UIColor, background: UIColor) {
         switch index {
-        case 0: return ("JACKPOT · 1,000,000", UIColor(hex: "#B45309"), UIColor(hex: "#FEF3C7"))
-        case 1: return ("FREE SPIN x 10", UIColor(hex: "#047857"), UIColor(hex: "#CCFBF1"))
+        case 0: return ("TOP WIN · x100", UIColor(hex: "#B45309"), UIColor(hex: "#FEF3C7"))
+        case 1: return ("5-REEL GAME", UIColor(hex: "#047857"), UIColor(hex: "#CCFBF1"))
         default: return ("BONUS GAME", .midPurple, UIColor(hex: "#EDE9FE"))
         }
     }
@@ -327,9 +327,9 @@ final class GameListViewController: BaseViewController {
     private func tag(for index: Int) -> (text: String, color: UIColor, background: UIColor) {
         switch index {
         case 0:
-            return ("JACKPOT · 1,000,000", UIColor(hex: "#B45309"), UIColor(hex: "#FEF3C7"))
+            return ("TOP WIN · x100", UIColor(hex: "#B45309"), UIColor(hex: "#FEF3C7"))
         case 1:
-            return ("FREE SPIN x 10", UIColor(hex: "#047857"), UIColor(hex: "#CCFBF1"))
+            return ("5-REEL GAME", UIColor(hex: "#047857"), UIColor(hex: "#CCFBF1"))
         default:
             return ("BONUS GAME", .midPurple, UIColor(hex: "#EDE9FE"))
         }
